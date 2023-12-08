@@ -5,9 +5,9 @@ __pycache__/
 
 padim.egg-info/
 build/
-datasets/mvtec_anomaly_detection
+datasets/
 dist/
-#results/
+results/
 wandb/
 tb_logger/
 
