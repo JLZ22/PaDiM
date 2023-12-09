@@ -15,7 +15,6 @@ import torch
 from torch import nn, Tensor
 from torchvision import models
 from torchvision.models.feature_extraction import create_feature_extractor
-import random
 
 __all__ = [
     "FeatureExtractor",
@@ -34,7 +33,6 @@ class FeatureExtractor(nn.Module):
             return_nodes: list[str],
             pre_trained: bool = True,
             requires_grad: bool = False,
-            reduce_dim: bool = False,
     ) -> None:
         r"""Extract features from a CNN.
 
@@ -64,16 +62,6 @@ class FeatureExtractor(nn.Module):
         if backbone not in BACKBONE_WEIGHTS_DICT.keys():
             raise ValueError(f"Backbone {backbone} not supported. Supported backbones are {list(BACKBONE_WEIGHTS_DICT.keys())}")
 
-        self.reduce_dim = reduce_dim
-        if reduce_dim:
-            if self.backbone == "resnet18":
-                t_d = 448
-                d = 100
-            else:
-                t_d = 1792
-                d = 550
-            self.idx = torch.tensor(random.sample(range(0, t_d), d))
-
         model = models.__dict__[backbone](weights=BACKBONE_WEIGHTS_DICT[backbone] if pre_trained else None)
         self.feature_extractor = create_feature_extractor(model, return_nodes)
 
@@ -81,8 +69,4 @@ class FeatureExtractor(nn.Module):
             model_parameters.requires_grad = requires_grad
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.feature_extractor(x)
-
-        if self.reduce_dim:
-            x = torch.index_select(x, 1, self.idx)
-        return x
+        return self.feature_extractor(x)

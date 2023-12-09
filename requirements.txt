@@ -1,5 +1,3 @@
 timm
 PyYAML
-torch
-overrides
 wandb
