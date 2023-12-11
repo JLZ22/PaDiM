@@ -11,5 +11,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .module import *
-from .padim import *
+
+import torch
+from torch import nn, Tensor
+
+from .module import FeatureExtractor
+
+MODEL_NUM_FEATURES = {
+    "resnet18": 100,
+    "wide_resnet50_2": 550,
+}
+
+MODEL_MAX_FEATURES = {
+    "resnet18": 100,
+    "wide_resnet50_2": 550,
+}
+
+
+class PaDiM(nn.Module):
+    def __init__(
+            self,
+            backbone: str,
+            return_nodes: list[str],
+            pre_trained: bool = True,
+    ) -> None:
+        super().__init__()
+        self.feature_extractor = FeatureExtractor(backbone, return_nodes, pre_trained=pre_trained)
+
+    def forward(self, x: Tensor) -> Tensor:
+        with torch.no_grad():
+            features = self.feature_extractor(x)
+            return features

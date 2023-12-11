@@ -13,9 +13,10 @@
 # ==============================================================================
 from typing import Dict
 from padim.utils.seed import init_seed
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
+
 
 class Trainer:
-    def __init(self, config: OmegaConf.to_yaml) -> None:
+    def __init(self, config: DictConfig) -> None:
         init_seed(config.SEED)
         self.config = config

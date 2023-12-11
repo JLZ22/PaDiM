@@ -43,7 +43,6 @@ class FeatureExtractor(nn.Module):
             requires_grad (bool): Whether to require gradients for the backbone. Defaults to False.
                 Models like ``stfpm`` use the feature extractor model as a trainable network. In such cases gradient
                 computation is required.
-            reduce_dim (bool): Whether to reduce the dimensionality of the extracted features. Defaults to False.
 
         Examples:
             >>> import torch

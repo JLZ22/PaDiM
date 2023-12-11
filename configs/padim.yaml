@@ -5,6 +5,7 @@ DEVICE: "cuda"
 
 MODEL:
   ARCH: "resnet18"
+  RETURN_MODES: ["layer1.1.relu_1", "layer2.1.relu_1", "layer3.1.relu_1"]
   COMPILE_MODE: True
 
 DATASETS:
