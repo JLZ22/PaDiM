@@ -11,5 +11,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .ops import *
-from .seed import *
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logger(level: int | str = logging.INFO) -> None:
+    """Get console logger by name.
+
+    Args:
+        level (int | str, optional): Logger Level. Defaults to logging.INFO.
+
+    Returns:
+        Logger: The expected logger.
+    """
+
+    if isinstance(level, str):
+        level = logging.getLevelName(level)
+
+    format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    logging.basicConfig(format=format_string, level=level)

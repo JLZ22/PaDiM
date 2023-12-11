@@ -11,5 +11,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .ops import *
-from .seed import *
+import random
+
+import numpy as np
+import torch
+
+__all__ = [
+    "init_seed",
+]
+
+
+def init_seed(seed: int) -> None:
+    # Fixed random seed for reproducibility
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)

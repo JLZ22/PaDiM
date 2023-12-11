@@ -29,7 +29,7 @@ def calculate_distance_matrix(embedding: Tensor, stats: list[Tensor]) -> Tensor:
 
     Args:
         embedding (Tensor): The input tensor of shape (batch_size, channels, height, width).
-        stats (list[Tensor]): The statistics of the training dataset.
+        stats (list[Tensor]): The statistics of the training data.
 
     Examples:
         >>> import torch
@@ -103,8 +103,8 @@ def de_normalization(
 
     Args:
         x (np.ndarray): The input tensor of shape (batch_size, channels, height, width).
-        mean (tuple[float]): The mean of the dataset.
-        std (tuple[float]): The standard deviation of the dataset.
+        mean (tuple[float]): The mean of the data.
+        std (tuple[float]): The standard deviation of the data.
 
     Examples:
         >>> import torch

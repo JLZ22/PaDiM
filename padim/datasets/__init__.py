@@ -11,5 +11,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .ops import *
-from .seed import *
+from .mvtec import MVTecDataset

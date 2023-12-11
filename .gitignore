@@ -5,7 +5,6 @@ __pycache__/
 
 padim.egg-info/
 build/
-datasets/
 dist/
 results/
 wandb/

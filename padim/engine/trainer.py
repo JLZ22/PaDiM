@@ -11,5 +11,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .ops import *
-from .seed import *
+from typing import Dict
+from padim.utils.seed import init_seed
+from omegaconf import OmegaConf
+
+class Trainer:
+    def __init(self, config: OmegaConf.to_yaml) -> None:
+        init_seed(config.SEED)
+        self.config = config

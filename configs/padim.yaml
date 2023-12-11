@@ -1,0 +1,19 @@
+PROJECT_NAME: "padim"
+EXP_NAME: "padim-mvtec"
+SEED: 42
+DEVICE: "cuda"
+
+MODEL:
+  ARCH: "resnet18"
+  COMPILE_MODE: True
+
+DATASETS:
+  ROOT: "./data/mvtec_anomaly_detection"
+  CATEGORY: "bottle"
+  TRANSFORMS:
+    RESIZE:
+      HEIGHT: 256
+      WIDTH: 256
+    NORMALIZE:
+      MEAN: [0.485, 0.456, 0.406]
+      STD: [0.229, 0.224, 0.225]

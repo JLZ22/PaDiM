@@ -1,3 +1,9 @@
 timm
 PyYAML
 wandb
+matplotlib
+scikit-image
+pillow
+albumentations
+omegaconf
+opencv-python

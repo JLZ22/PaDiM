@@ -11,5 +11,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .ops import *
-from .seed import *
+import argparse
+import logging
+
+logging.getLogger("padim")
+
+
+def get_opts() -> argparse.Namespace:
+    """Get parser.
+
+    Returns:
+        argparse.ArgumentParser: The parser object.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config-path", type=str, required=True, help="Path to a model config file")
+    parser.add_argument("--log-level", type=str, default="INFO", help="<DEBUG, INFO, WARNING, ERROR>")
+    opts = parser.parse_args()
+
+    return opts
