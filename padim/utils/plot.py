@@ -19,6 +19,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
+from torch.nn import functional as F_torch
 
 from .ops import de_normalization
 
@@ -27,11 +28,11 @@ __all__ = [
 ]
 
 
-def plot_score_map(test_image: np.ndarray, scores: np.ndarray, save_file_path: str | Path):
+def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | Path):
     vmax = 255.
     vmin = 0.
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    image = test_image
+    image = F_torch.interpolate(image, size=(scores.shape[1], scores.shape[2]), mode="bilinear")
     image = de_normalization(image)
     heat_map = scores * 255
     fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))
