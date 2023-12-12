@@ -46,7 +46,7 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | 
 
     # Add normal score
     pred_score = scores.reshape(-1).max()
-    text = f"score:{pred_score[0] * 100:.1f}%"
+    text = f"score:{pred_score * 100:.1f}%"
     ax_image[1].text(0.95, 0.95, text, transform=ax_image[1].transAxes, fontsize=10,
                      verticalalignment="top", horizontalalignment="right", color="white", bbox=dict(facecolor="red", alpha=0.5))
 
