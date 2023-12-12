@@ -32,7 +32,6 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | 
     vmax = 255.
     vmin = 0.
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    image = cv2.resize(image, (scores.shape[0], scores.shape[1]), interpolation=cv2.INTER_CUBIC)
     image = de_normalization(image)
     heat_map = scores * 255
     fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))

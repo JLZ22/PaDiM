@@ -30,7 +30,6 @@ class FolderDataset(torch.utils.data.Dataset):
     Args:
         root (str | Path): root directory of dataset where directory ``mvtec_anomaly_detection`` exists.
         image_size (int): image size after resizing.
-        center_crop (int): image size after center cropping.
         normalize_mean (list[float]): mean values for normalization.
         normalize_std (list[float]): std values for normalization.
 
@@ -49,7 +48,7 @@ class FolderDataset(torch.utils.data.Dataset):
     def __init__(
             self,
             root: str | Path,
-            image_size: int = 256,
+            image_size: int = 224,
             normalize_mean: [float, float, float] = None,
             normalize_std: [float, float, float] = None,
     ) -> None:
@@ -64,7 +63,7 @@ class FolderDataset(torch.utils.data.Dataset):
 
         # set transforms
         self.image_transforms = transforms.Compose([
-            transforms.Resize(image_size, InterpolationMode.NEAREST),
+            transforms.Resize((image_size, image_size), InterpolationMode.NEAREST),
             transforms.ToTensor(),
             transforms.Normalize(normalize_mean, normalize_std),
         ])
