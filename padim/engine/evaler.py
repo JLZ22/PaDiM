@@ -110,6 +110,7 @@ class Evaler:
                 eval_features[k].append(v)
 
         # Embedding concat
+        index = index.to(device)
         embedding = generate_embedding(eval_features, return_nodes, index)
 
         # calculate distance matrix

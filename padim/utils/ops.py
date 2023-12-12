@@ -180,7 +180,7 @@ def embedding_concat(x: Tensor, y: Tensor) -> Tensor:
     scale_ratio = int(height_x / height_y)
     x = F_torch.unfold(x, kernel_size=scale_ratio, dilation=1, stride=scale_ratio)
     x = x.view(batch_size, channels_x, -1, height_y, width_y)
-    out = torch.zeros(batch_size, channels_x + channels_y, x.size(2), height_y, width_y)
+    out = torch.zeros(batch_size, channels_x + channels_y, x.size(2), height_y, width_y, device=x.device)
 
     # Concatenate x and y
     for i in range(x.size(2)):

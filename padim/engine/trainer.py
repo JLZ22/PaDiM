@@ -117,6 +117,7 @@ class Trainer:
 
     def train(self) -> None:
         train_features = self.get_features()
+        self.index = self.index.to(self.device)
         embedding = generate_embedding(train_features, self.config.MODEL.RETURN_NODES, self.index)
         mean, inv_covariance = cal_multivariate_gaussian_distribution(embedding)
         train_features = [mean, inv_covariance]
