@@ -24,11 +24,11 @@ __all__ = [
 ]
 
 
-def get_data_transforms(config: DictConfig, mask_mode: bool = False) -> A.Compose:
+def get_data_transforms(dict_config: DictConfig, mask_mode: bool = False) -> A.Compose:
     """Get transforms from config or image size.
 
     Args:
-        config (str | A.Compose | None, optional): Albumentations transforms.
+        dict_config (DictConfig): Albumentations transforms.
             Either config or albumentations ``Compose`` object. Defaults to None.
         mask_mode (bool, optional): If True, return transforms for mask. Defaults to False.
 
@@ -36,20 +36,20 @@ def get_data_transforms(config: DictConfig, mask_mode: bool = False) -> A.Compos
         A.Compose: Albumentation ``Compose`` object containing the image transforms.
 
     Examples:
-        >>> config = OmegaConf.load("/tmp/transforms.yaml")
-        >>> config = OmegaConf.create(config)
-        >>> transforms = get_data_transforms(config)
+        >>> dict_config = OmegaConf.load("/tmp/transforms.yaml")
+        >>> dict_config = OmegaConf.create(dict_config)
+        >>> transforms = get_data_transforms(dict_config)
     """
     transforms: A.Compose
     transforms_list = []
 
-    if config is None:
+    if dict_config is None:
         raise ValueError("Not found transform in config.")
 
-    if config.RESIZE is not None:
-        transforms_list.append(A.Resize(config.RESIZE.HEIGHT, config.RESIZE.WIDTH))
-    if config.NORMALIZE is not None and not mask_mode:
-        transforms_list.append(A.Normalize(config.NORMALIZE.MEAN, config.NORMALIZE.STD))
+    if dict_config.RESIZE is not None:
+        transforms_list.append(A.Resize(dict_config.RESIZE.HEIGHT, dict_config.RESIZE.WIDTH))
+    if dict_config.NORMALIZE is not None and not mask_mode:
+        transforms_list.append(A.Normalize(dict_config.NORMALIZE.MEAN, dict_config.NORMALIZE.STD))
 
     if len(transforms_list) == 0:
         raise ValueError("Not found transform in config.")

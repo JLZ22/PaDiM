@@ -23,8 +23,8 @@ MODEL_NUM_FEATURES = {
 }
 
 MODEL_MAX_FEATURES = {
-    "resnet18": 100,
-    "wide_resnet50_2": 550,
+    "resnet18": 448,
+    "wide_resnet50_2": 1792,
 }
 
 
@@ -33,10 +33,10 @@ class PaDiM(nn.Module):
             self,
             backbone: str,
             return_nodes: list[str],
-            pre_trained: bool = True,
+            pretrained: bool = True,
     ) -> None:
         super().__init__()
-        self.feature_extractor = FeatureExtractor(backbone, return_nodes, pre_trained=pre_trained)
+        self.feature_extractor = FeatureExtractor(backbone, return_nodes, pretrained)
 
     def forward(self, x: Tensor) -> Tensor:
         with torch.no_grad():

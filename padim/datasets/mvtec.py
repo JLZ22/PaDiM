@@ -13,11 +13,12 @@
 # ==============================================================================
 import logging
 import os
+from pathlib import Path
 
 import cv2
 import torch
+import torch.utils.data
 from omegaconf import DictConfig
-from torch.utils.data import Dataset
 
 from padim.utils.download import DownloadInfo
 from padim.utils.transform import get_data_transforms
@@ -49,19 +50,22 @@ CLASS_NAMES = [
 ]
 
 
-class MVTecDataset(Dataset):
+class MVTecDataset(torch.utils.data.Dataset):
     r"""MVTec Dataset
 
     Args:
-        config (DictConfig): configuration
+        root (str | Path): root directory of dataset where directory ``mvtec_anomaly_detection`` exists.
+        category (str): category name of dataset (``bottle``, ``cable``, ``capsule``, ``carpet``, ``grid``, ``hazelnut``, ``leather``, ``metal_nut``, ``pill``, ``screw``, ``tile``, ``toothbrush``, ``transistor``, ``wood``, ``zipper``).
+        transforms_dict_config (DictConfig): transforms config for image and mask.
         is_train (bool, optional): if True, load train dataset, else load test dataset. Defaults to True.
 
     Examples:
         >>> from padim.datasets import MVTecDataset
         >>> from omegaconf import OmegaConf
-        >>> config = OmegaConf.load("config.yaml")
-        >>> config = OmegaConf.create(config)
-        >>> dataset = MVTecDataset(config, is_train=True)
+        >>> transforms_dict_config = OmegaConf.load("configs/transforms.yaml")
+        >>> dataset = MVTecDataset(root="./data/mvtec_anomaly_detection", category="bottle", transforms_dict_config=transforms_dict_config, is_train=True)
+        >>> len(dataset)
+        209
         >>> image, target, mask = dataset[0]
         >>> image.shape
         torch.Size([3, 256, 256])
@@ -70,21 +74,24 @@ class MVTecDataset(Dataset):
         >>> mask.shape
         torch.Size([1, 256, 256])
     """
+
     def __init__(
             self,
-            config: DictConfig,
+            root: str | Path,
+            category: str,
+            transforms_dict_config: DictConfig,
             is_train: bool = True,
     ) -> None:
         super().__init__()
-        self.root = str(config.ROOT)
-        self.category = str(config.CATEGORY)
+        self.root = root
+        self.category = category
         self.is_train = is_train
 
         # set transforms
-        self.transform_image = get_data_transforms(config.TRANSFORMS, mask_mode=False)
-        self.transform_mask = get_data_transforms(config.TRANSFORMS, mask_mode=True)
-        self.mask_height = config.TRANSFORMS.RESIZE.HEIGHT
-        self.mask_width = config.TRANSFORMS.RESIZE.WIDTH
+        self.transform_image = get_data_transforms(transforms_dict_config, mask_mode=False)
+        self.transform_mask = get_data_transforms(transforms_dict_config, mask_mode=True)
+        self.mask_height = transforms_dict_config.RESIZE.HEIGHT
+        self.mask_width = transforms_dict_config.RESIZE.WIDTH
 
         # load dataset
         self.images, self.targets, self.masks = self.load()

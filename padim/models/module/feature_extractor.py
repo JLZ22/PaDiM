@@ -31,7 +31,7 @@ class FeatureExtractor(nn.Module):
             self,
             backbone: str,
             return_nodes: list[str],
-            pre_trained: bool = True,
+            pretrained: bool = True,
             requires_grad: bool = False,
     ) -> None:
         r"""Extract features from a CNN.
@@ -39,7 +39,7 @@ class FeatureExtractor(nn.Module):
         Args:
             backbone (str): The backbone to which the feature extraction hooks are attached.
             return_nodes (list[str]): List of node names of the backbone to which the hooks are attached.
-            pre_trained (bool): Whether to use a pre-trained backbone. Defaults to True.
+            pretrained (bool): Whether to use a pre-trained backbone. Defaults to True.
             requires_grad (bool): Whether to require gradients for the backbone. Defaults to False.
                 Models like ``stfpm`` use the feature extractor model as a trainable network. In such cases gradient
                 computation is required.
@@ -49,7 +49,7 @@ class FeatureExtractor(nn.Module):
             >>> from padim.models import FeatureExtractor
 
             >>> model = FeatureExtractor(backbone="resnet18", return_nodes=["layer1.1.relu_1", "layer2.1.relu_1", "layer3.1.relu_1"])
-            >>> x = torch.rand((32, 3, 256, 256))
+            >>> x = torch.rand((32, 3, 224, 224))
             >>> features = model(x)
 
             >>> [layer for layer in features.keys()]
@@ -61,7 +61,7 @@ class FeatureExtractor(nn.Module):
         if backbone not in BACKBONE_WEIGHTS_DICT.keys():
             raise ValueError(f"Backbone {backbone} not supported. Supported backbones are {list(BACKBONE_WEIGHTS_DICT.keys())}")
 
-        model = models.__dict__[backbone](weights=BACKBONE_WEIGHTS_DICT[backbone] if pre_trained else None)
+        model = models.__dict__[backbone](weights=BACKBONE_WEIGHTS_DICT[backbone] if pretrained else None)
         self.feature_extractor = create_feature_extractor(model, return_nodes)
 
         for model_parameters in self.feature_extractor.parameters():

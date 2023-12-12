@@ -13,12 +13,10 @@
 # ==============================================================================
 import argparse
 import logging
-import warnings
 
 from omegaconf import OmegaConf
 
-from padim.engine import Trainer
-from padim.utils.logger import configure_logger
+from padim.engine import Evaler
 from padim.utils.seed import init_seed
 
 logger = logging.getLogger("padim")
@@ -31,36 +29,30 @@ def get_opts() -> argparse.Namespace:
         argparse.ArgumentParser: The parser object.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("config", metavar="FILE", help="Path to config file.")
-    parser.add_argument("--log-level", type=str, default="INFO", help="<DEBUG, INFO, WARNING, ERROR>")
+    parser.add_argument("--config-path", metavar="FILE", required=True, help="Path to config file.")
     opts = parser.parse_args()
 
     return opts
 
 
-def train(args: argparse.Namespace):
+def validation(args: argparse.Namespace):
     """Train an anomaly model.
 
     Args:
         args (Namespace): The arguments from the command line.
     """
 
-    configure_logger(level=args.log_level)
-
-    if args.log_level == "ERROR":
-        warnings.filterwarnings("ignore")
-
-    config = OmegaConf.load(args.config)
+    config = OmegaConf.load(args.config_path)
     config = OmegaConf.create(config)
 
     if config.get("SEED") is not None:
         init_seed(config.SEED)
 
-    trainer = Trainer(config)
-    logger.info("Start training the model.")
-    trainer.train()
+    evaler = Evaler(config)
+    logger.info("Start validation the model.")
+    evaler.validation()
 
 
 if __name__ == "__main__":
     opts = get_opts()
-    train(opts)
+    validation(opts)

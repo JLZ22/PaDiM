@@ -69,10 +69,10 @@ def cal_multivariate_gaussian_distribution(x: Tensor) -> [np.ndarray, np.ndarray
         >>> import torch
         >>> from padim.utils import cal_multivariate_gaussian_distribution
         >>> x = torch.rand((32, 3, 256, 256))
-        >>> mean, cov_inv = cal_multivariate_gaussian_distribution(x)
+        >>> mean, inv_covariance = cal_multivariate_gaussian_distribution(x)
         >>> mean.shape
             (3, 196608)
-        >>> cov_inv.shape
+        >>> inv_covariance.shape
             (32, 3, 196608)
 
     Returns:
@@ -80,18 +80,14 @@ def cal_multivariate_gaussian_distribution(x: Tensor) -> [np.ndarray, np.ndarray
         cov_inv (np.ndarray): The inverse covariance of the multivariate Gaussian distribution.
     """
     batch_size, channels, height, width = x.size()
-    device = x.device
     embedding_vectors = x.view(batch_size, channels, height * width)
     mean = torch.mean(embedding_vectors, dim=0).numpy()
-    _cov = torch.zeros(channels, channels).numpy()
-    cov_inv = torch.zeros(batch_size, channels, height * width).numpy()
-    identity_channels = np.identity(channels)
+    inv_covariance = torch.zeros(channels, channels, height * width).numpy()
+    I = np.identity(channels)
     for i in range(height * width):
-        _cov = np.cov(embedding_vectors[:, :, i].numpy(), rowvar=False) + 0.01 * identity_channels
-        _cov = torch.Tensor(_cov).to(device)
-        cov_inv[:, :, i] = torch.linalg.inv(_cov).cpu().numpy()
+        inv_covariance[:, :, i] = np.cov(embedding_vectors[:, :, i].numpy(), rowvar=False) + 0.01 * I
 
-    return mean, cov_inv
+    return mean, inv_covariance
 
 
 def de_normalization(

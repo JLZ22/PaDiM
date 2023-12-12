@@ -12,26 +12,29 @@
 # limitations under the License.
 # ==============================================================================
 import logging
+from typing import Union
+
+import torch
+
+__all__ = [
+    "select_device",
+]
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    "configure_logger",
-]
 
+def select_device(device: Union[str, int] = "") -> torch.device:
+    if device == "cpu" or device == "":
+        logger.info("Use CPU.")
+        device = torch.device("cpu")
+    elif device == "cuda" or device == "gpu":
+        if not torch.cuda.is_available():
+            logger.warning("CUDA is not available, use CPU.")
+            device = torch.device("cpu")
+        else:
+            logger.info("Use CUDA.")
+            device = torch.device("cuda")
+    else:
+        raise ValueError(f"Device '{device}' not supported. Choices: ['cpu', 'cuda', 'gpu']")
 
-def configure_logger(level: int | str = logging.INFO) -> None:
-    """Get console logger by name.
-
-    Args:
-        level (int | str, optional): Logger Level. Defaults to logging.INFO.
-
-    Returns:
-        Logger: The expected logger.
-    """
-
-    if isinstance(level, str):
-        level = logging.getLevelName(level)
-
-    format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    logging.basicConfig(format=format_string, level=level)
+    return device

@@ -7,3 +7,4 @@ pillow
 albumentations
 omegaconf
 opencv-python
+tqdm
