@@ -49,7 +49,6 @@ class Evaler:
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
             self.config.DATASETS.TRANSFORMS.RESIZE,
-            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             is_train=False,
         )
         val_dataloader = torch.utils.data.DataLoader(
@@ -191,7 +190,7 @@ class Evaler:
             OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
             index,
             train_features,
-            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            self.config.DATASETS.TRANSFORMS.RESIZE,
             task,
             device,
             save_visual_dir,
