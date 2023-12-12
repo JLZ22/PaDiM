@@ -24,7 +24,7 @@ from omegaconf import DictConfig, OmegaConf
 from torch import nn
 from tqdm import tqdm
 
-from padim.datasets import MVTecDataset
+from padim.datasets import MVTecDataset, FolderDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
 from padim.utils import select_device, cal_multivariate_gaussian_distribution, generate_embedding
 from .evaler import Evaler
@@ -36,6 +36,13 @@ class Trainer:
     def __init__(self, config: DictConfig) -> None:
         self.config = config
         self.device = select_device(config["DEVICE"])
+
+        if self.config.TASK == "classification":
+            self.task = 0
+        elif self.config.TASK == "segmentation":
+            self.task = 1
+        else:
+            raise ValueError(f"Task '{self.config.TASK}' is not supported.")
 
         self.model = self.create_model()
         self.train_dataloader, self.val_dataloader = self.get_dataloader()
@@ -63,20 +70,32 @@ class Trainer:
         return model
 
     def get_dataloader(self) -> [torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
-        train_dataset = MVTecDataset(
-            self.config.DATASETS.ROOT,
-            self.config.DATASETS.CATEGORY,
-            self.config.DATASETS.TRANSFORMS.RESIZE,
-            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
-            is_train=True,
-        )
-        val_dataset = MVTecDataset(
-            self.config.DATASETS.ROOT,
-            self.config.DATASETS.CATEGORY,
-            self.config.DATASETS.TRANSFORMS.RESIZE,
-            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
-            is_train=False,
-        )
+        if self.task == 0:
+            train_dataset = FolderDataset(
+                self.config.DATASETS.ROOT.TRAIN,
+                self.config.DATASETS.TRANSFORMS.RESIZE,
+                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            )
+            val_dataset = FolderDataset(
+                self.config.DATASETS.ROOT.TEST,
+                self.config.DATASETS.TRANSFORMS.RESIZE,
+                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            )
+        else:
+            train_dataset = MVTecDataset(
+                self.config.DATASETS.ROOT,
+                self.config.DATASETS.CATEGORY,
+                self.config.DATASETS.TRANSFORMS.RESIZE,
+                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+                is_train=True,
+            )
+            val_dataset = MVTecDataset(
+                self.config.DATASETS.ROOT,
+                self.config.DATASETS.CATEGORY,
+                self.config.DATASETS.TRANSFORMS.RESIZE,
+                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+                is_train=False,
+            )
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=self.config["TRAIN"]["HYP"]["IMGS_PER_BATCH"],
@@ -124,14 +143,14 @@ class Trainer:
 
         self.save_checkpoint(train_features)
 
-        self.evaler.run_validation(
-            self.model,
-            self.config.DATASETS.CATEGORY,
-            self.val_dataloader,
-            OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
-            self.index,
-            train_features,
-            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
-            self.device,
-            self.save_visual_dir,
-        )
+        # self.evaler.run_validation(
+        #     self.model,
+        #     self.config.DATASETS.CATEGORY,
+        #     self.val_dataloader,
+        #     OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
+        #     self.index,
+        #     train_features,
+        #     self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+        #     self.device,
+        #     self.save_visual_dir,
+        # )

@@ -2,15 +2,16 @@ PROJECT_NAME: "padim"
 EXP_NAME: "padim-mvtec"
 SEED: 42
 DEVICE: "cpu"
-TASK: "segmentation"
+TASK: "classification"
 
 MODEL:
   BACKBONE: "resnet18"
   RETURN_NODES: ["layer1.1.relu_1", "layer2.1.relu_1", "layer3.1.relu_1"]
 
 DATASETS:
-  ROOT: "./data/mvtec_anomaly_detection"
-  CATEGORY: "bottle"
+  ROOT:
+    TRAIN: "./data/folder/train"
+    TEST: "./data/folder/test"
   TRANSFORMS:
     RESIZE: 256
     CENTER_CROP: 224

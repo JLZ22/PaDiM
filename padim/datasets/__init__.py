@@ -12,3 +12,4 @@
 # limitations under the License.
 # ==============================================================================
 from .mvtec import MVTecDataset
+from .folder import FolderDataset
