@@ -46,7 +46,7 @@ def calculate_distance_matrix(embedding: Tensor, stats: list[Tensor]) -> np.ndar
         distances (np.ndarray): The distance matrix of the input tensor.
     """
     batch_size, channels, height, width = embedding.size()
-    embedding_vectors = embedding.view(batch_size, channels, height * width).numpy()
+    embedding_vectors = embedding.cpu().view(batch_size, channels, height * width).numpy()
     distances = []
     for i in range(height * width):
         mean = stats[0][:, i]
@@ -79,12 +79,12 @@ def cal_multivariate_gaussian_distribution(x: Tensor) -> [np.ndarray, np.ndarray
         cov_inv (np.ndarray): The inverse covariance of the multivariate Gaussian distribution.
     """
     batch_size, channels, height, width = x.size()
-    embedding_vectors = x.view(batch_size, channels, height * width)
+    embedding_vectors = x.view(batch_size, channels, height * width).cpu()
     mean = torch.mean(embedding_vectors, dim=0).numpy()
     inv_covariance = torch.zeros(channels, channels, height * width).numpy()
     I = np.identity(channels)
     for i in range(height * width):
-        inv_covariance[:, :, i] = np.cov(embedding_vectors[:, :, i].numpy(), rowvar=False) + 0.01 * I
+        inv_covariance[:, :, i] = np.cov(embedding_vectors[:, :, i], rowvar=False) + 0.01 * I
 
     return mean, inv_covariance
 
