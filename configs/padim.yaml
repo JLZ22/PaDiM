@@ -10,6 +10,9 @@ MODEL:
 DATASETS:
   ROOT: "./data/mvtec_anomaly_detection"
   CATEGORY: "bottle"
+  TRANSFORMS:
+    RESIZE: 256
+    CENTER_CROP: 224
 
 TRAIN:
   HYP:

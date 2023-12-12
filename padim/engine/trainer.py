@@ -62,6 +62,8 @@ class Trainer:
         train_dataset = MVTecDataset(
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
+            self.config.DATASETS.TRANSFORMS.RESIZE,
+            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             is_train=True,
         )
         train_dataloader = torch.utils.data.DataLoader(
