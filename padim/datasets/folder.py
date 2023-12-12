@@ -14,6 +14,7 @@
 import logging
 import os
 from pathlib import Path
+from typing import Tuple, Any
 
 import torch.utils.data
 from PIL import Image
@@ -75,11 +76,12 @@ class FolderDataset(torch.utils.data.Dataset):
         # load dataset
         self.images = sorted(os.listdir(self.root))
 
-    def __getitem__(self, index: int) -> Tensor:
-        image = Image.open(self.images[index]).convert("RGB")
+    def __getitem__(self, index: int) -> tuple[Any, Any, Any]:
+        image_path = os.path.join(self.root, self.images[index])
+        image = Image.open(image_path).convert("RGB")
         image = self.image_transforms(image)
 
-        return image
+        return image, image, image
 
     def __len__(self):
         return len(self.images)
