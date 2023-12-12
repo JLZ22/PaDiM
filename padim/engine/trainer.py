@@ -75,7 +75,7 @@ class Trainer:
 
     def get_features(self) -> Any:
         features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
-        for (images, _, _) in tqdm(self.train_dataloader, f"train `{self.config.DATASETS.CATEGORY}`"):
+        for (images, _, _) in tqdm(self.train_dataloader, f"get features"):
             if self.device.type == "cuda" and torch.cuda.is_available():
                 images = images.to(self.device, non_blocking=True)
             features = self.model(images)
@@ -91,12 +91,14 @@ class Trainer:
             features[k] = torch.cat(v, 0)
 
         # Embedding concat
-        embedding_vectors = features[self.config.MODEL.RETURN_NODES[0]]
+        embedding = features[self.config.MODEL.RETURN_NODES[0]]
         for layer_name in self.config.MODEL.RETURN_NODES[1:]:
-            embedding_vectors = embedding_concat(embedding_vectors, features[layer_name])
+            embedding = embedding_concat(embedding, features[layer_name])
 
         # randomly select d dimension
-        embedding_vectors = torch.index_select(embedding_vectors, 1, self.idx)
+        embedding = torch.index_select(embedding, 1, self.idx)
+
+        return embedding
 
     def save_checkpoint(self, state_dict: Any) -> None:
         with open(self.save_weights_path, "wb") as f:
