@@ -14,12 +14,12 @@
 import os
 from pathlib import Path
 
+import cv2
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from skimage import morphology
 from skimage.segmentation import mark_boundaries
-from torch.nn import functional as F_torch
 
 from .ops import de_normalization
 
@@ -28,11 +28,11 @@ __all__ = [
 ]
 
 
-def plot_score_map(image: np.ndarray, scores: np.ndarray, image_size: int, save_file_path: str | Path):
+def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | Path):
     vmax = 255.
     vmin = 0.
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    image = F_torch.interpolate(image, size=(image_size, image_size), mode="bilinear")
+    image = cv2.resize(image, (scores.shape[0], scores.shape[1]), interpolation=cv2.INTER_CUBIC)
     image = de_normalization(image)
     heat_map = scores * 255
     fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))
