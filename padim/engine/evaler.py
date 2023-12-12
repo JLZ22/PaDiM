@@ -123,9 +123,9 @@ class Evaler:
         scores = get_abnormal_score(distances, image_size)
 
         if task == 0:
-            num_images = len(test_images)
+            num_images = len(test_image_names[0])
             for i in range(num_images):
-                save_file_name = os.path.join(save_visual_dir, f"{test_image_names[i]}.png")
+                save_file_name = os.path.join(save_visual_dir, f"{test_image_names[0][i]}.png")
                 plot_score_map(test_images[i], scores[i], save_file_name)
         else:
             # calculate image-level ROC AUC score
