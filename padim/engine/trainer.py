@@ -119,8 +119,9 @@ class Trainer:
         train_features = self.get_features()
         embedding = generate_embedding(train_features, self.config.MODEL.RETURN_NODES, self.index)
         mean, inv_covariance = cal_multivariate_gaussian_distribution(embedding)
+        train_features = [mean, inv_covariance]
 
-        self.save_checkpoint([mean, inv_covariance])
+        self.save_checkpoint(train_features)
 
         self.evaler.run_validation(
             self.model,
