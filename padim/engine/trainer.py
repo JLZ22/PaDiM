@@ -105,7 +105,7 @@ class Trainer:
         val_dataloader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
-            shuffle=True,
+            shuffle=False,
             num_workers=4,
             sampler=None,
             pin_memory=True,

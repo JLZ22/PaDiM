@@ -59,7 +59,7 @@ class Evaler:
             )
         val_dataloader = torch.utils.data.DataLoader(
             val_dataset,
-            batch_size=self.config["TRAIN"]["HYP"]["IMGS_PER_BATCH"],
+            batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
             shuffle=True,
             num_workers=4,
             sampler=None,
@@ -133,7 +133,7 @@ class Evaler:
         scores = (anomaly_map - min_score) / (max_score - min_score)
 
         if task == 0:
-            num_images = len(test_image_names[0])
+            num_images = len(scores)
             for i in range(num_images):
                 save_file_name = os.path.join(save_visual_dir, test_image_names[0][i].split(".")[0] + ".png")
                 plot_score_map(test_images[i], scores[i], save_file_name)

@@ -28,11 +28,12 @@ __all__ = [
 
 
 def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | Path):
-    vmax = 255.
-    vmin = 0.
+    vmax = scores.max() * 255.
+    vmin = scores.min() * 255.
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     image = de_normalization(image)
     heat_map = scores * 255
+    print(heat_map)
     fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))
     fig_image.subplots_adjust(right=0.9)
     for ax_i in ax_image:
@@ -56,9 +57,8 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | 
 
 def plot_fig(test_image, scores, gts, threshold, save_dir, class_name):
     num = len(scores)
-    vmax = 255.
-    vmin = 0.
-    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    vmax = scores.max() * 255.
+    vmin = scores.min() * 255.
     for i in range(num):
         image = test_image[i]
         image = de_normalization(image)
@@ -73,6 +73,7 @@ def plot_fig(test_image, scores, gts, threshold, save_dir, class_name):
         vis_image = mark_boundaries(image, mask, color=(1, 0, 0), mode="thick")
         fig_image, ax_image = plt.subplots(1, 5, figsize=(12, 3))
         fig_image.subplots_adjust(right=0.9)
+        norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
         for ax_i in ax_image:
             ax_i.axes.xaxis.set_visible(False)
             ax_i.axes.yaxis.set_visible(False)
@@ -80,8 +81,9 @@ def plot_fig(test_image, scores, gts, threshold, save_dir, class_name):
         ax_image[0].title.set_text("Image")
         ax_image[1].imshow(gt, cmap="gray")
         ax_image[1].title.set_text("GroundTruth")
+        ax = ax_image[2].imshow(heat_map, cmap="jet", norm=norm)
         ax_image[2].imshow(image, cmap="gray", interpolation="none")
-        ax = ax_image[2].imshow(heat_map, cmap="jet", alpha=0.5, interpolation="none", norm=norm)
+        ax_image[2].imshow(heat_map, cmap="jet", alpha=0.5, interpolation="none")
         ax_image[2].title.set_text("Predicted heat map")
         ax_image[3].imshow(mask, cmap="gray")
         ax_image[3].title.set_text("Predicted mask")
