@@ -32,7 +32,7 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | 
     vmax = 255.
     vmin = 0.
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    image = F_torch.interpolate(image, size=scores.shape, mode="bilinear")
+    image = F_torch.interpolate(image, size=(scores.shape[0], scores.shape[1]), mode="bilinear")
     image = de_normalization(image)
     heat_map = scores * 255
     fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))
