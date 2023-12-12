@@ -11,11 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-import itertools
-
 import numpy as np
 import torch
-from scipy.spatial import distance
+from scipy.spatial.distance import mahalanobis
 from torch import Tensor
 from torch.nn import functional as F_torch
 
@@ -24,7 +22,7 @@ __all__ = [
 ]
 
 
-def calculate_distance_matrix(embedding: Tensor, stats: list[Tensor]) -> Tensor:
+def calculate_distance_matrix(embedding: Tensor, stats: list[Tensor]) -> np.ndarray:
     r"""Calculate the distance matrix of the input tensor.
 
     Args:
@@ -41,21 +39,18 @@ def calculate_distance_matrix(embedding: Tensor, stats: list[Tensor]) -> Tensor:
             torch.Size([32, 196608, 196608])
 
     Returns:
-        out (Tensor): The distance matrix of the input tensor.
+        distances (np.ndarray): The distance matrix of the input tensor.
     """
     batch_size, channels, height, width = embedding.size()
     embedding_vectors = embedding.view(batch_size, channels, height * width).numpy()
-
-    distances = []
+    dist_list = []
     for i in range(height * width):
         mean = stats[0][:, i]
-        dist = distance.cdist(embedding_vectors[:, :, i], mean[None, :], metric="mahalanobis", VI=stats[1][:, :, i])
-        dist = list(itertools.chain(*dist))
-        distances.append(dist)
+        conv_inv = np.linalg.inv(stats[1][:, :, i])
+        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
+        dist_list.append(dist)
 
-    distances = np.array(distances).transpose(1, 0).reshape(batch_size, height, width)
-    distances = torch.tensor(distances)
-
+    distances = np.array(dist_list).transpose(1, 0).reshape(batch_size, height, width)
     return distances
 
 

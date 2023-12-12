@@ -22,7 +22,7 @@ from omegaconf import DictConfig
 
 from padim.utils.download import DownloadInfo
 from padim.utils.transform import get_data_transforms
-
+from albumentations.pytorch import ToTensorV2
 logger = logging.getLogger(__name__)
 
 DOWNLOAD_INFO = DownloadInfo(
@@ -136,6 +136,7 @@ class MVTecDataset(torch.utils.data.Dataset):
 
         if self.targets[index] == 0:
             mask = torch.zeros([1, self.mask_height, self.mask_width])
+            mask = {"image": mask}
         else:
             mask = cv2.imread(self.masks[index])
             mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)

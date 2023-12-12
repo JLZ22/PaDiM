@@ -34,7 +34,7 @@ from tqdm import tqdm
 
 from padim.datasets import MVTecDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
-from padim.utils import select_device, cal_multivariate_gaussian_distribution, embedding_concat, plot_fig
+from padim.utils import select_device, cal_multivariate_gaussian_distribution, embedding_concat, plot_fig, calculate_distance_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,7 @@ class Trainer:
         num_features = MODEL_NUM_FEATURES[self.config.MODEL.BACKBONE]
         self.idx = torch.tensor(random.sample(range(0, max_features), num_features))
         self.train_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
+        self.eval_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
 
         # Create a folder to save the model
         save_weights_dir = os.path.join("results", "train", config.EXP_NAME)
@@ -122,6 +123,89 @@ class Trainer:
         weights_path = self.config.TRAIN.WEIGHTS_PATH
         if os.path.exists(weights_path):
             self.load_checkpoint(weights_path)
+
+            test_images = []
+            gt_list = []
+            gt_mask_list = []
+
+            # extract test set features
+            for (images, targets, masks) in tqdm(self.val_dataloader, f"eval `{self.config.DATASETS.CATEGORY}`"):
+                images = images["image"]
+                masks = masks["image"]
+
+                test_images.extend(images.cpu().detach().numpy())
+                gt_list.extend(targets.cpu().detach().numpy())
+                gt_mask_list.extend(masks.cpu().detach().numpy())
+                # model prediction
+                if self.device.type == "cuda" and torch.cuda.is_available():
+                    images = images.to(self.device, non_blocking=True)
+                features = self.model(images)
+                # get intermediate layer outputs
+                for k, v in features.items():
+                    self.eval_features_output[k].append(v)
+
+            # Concatenate the features
+            for k, v in self.eval_features_output.items():
+                self.eval_features_output[k] = torch.cat(v, 0)
+
+            # Embedding concat
+            embedding_vectors = self.eval_features_output[self.config.MODEL.RETURN_NODES[0]]
+            for layer_name in self.config.MODEL.RETURN_NODES[1:]:
+                embedding_vectors = embedding_concat(embedding_vectors, self.eval_features_output[layer_name])
+
+            # randomly select d dimension
+            embedding_vectors = torch.index_select(embedding_vectors, 1, self.idx)
+
+            distance = calculate_distance_matrix(embedding_vectors, self.train_features_output)
+
+            # upsample
+            dist_list = torch.tensor(distance)
+            score_map = F_torch.interpolate(dist_list.unsqueeze(1), size=images.size(2), mode='bilinear',
+                                            align_corners=False).squeeze().numpy()
+
+            # apply gaussian smoothing on the score map
+            for i in range(score_map.shape[0]):
+                score_map[i] = gaussian_filter(score_map[i], sigma=4)
+
+            # Normalization
+            max_score = score_map.max()
+            min_score = score_map.min()
+            scores = (score_map - min_score) / (max_score - min_score)
+
+            # calculate image-level ROC AUC score
+            fig, ax = plt.subplots(1, 2, figsize=(20, 10))
+            fig_img_rocauc = ax[0]
+            fig_pixel_rocauc = ax[1]
+
+            total_roc_auc = []
+            total_pixel_roc_auc = []
+            img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+            gt_list = np.asarray(gt_list)
+            fpr, tpr, _ = roc_curve(gt_list, img_scores)
+            img_roc_auc = roc_auc_score(gt_list, img_scores)
+            total_roc_auc.append(img_roc_auc)
+            print('image ROCAUC: %.3f' % (img_roc_auc))
+            fig_img_rocauc.plot(fpr, tpr, label='%s img_ROCAUC: %.3f' % (self.config.DATASETS.CATEGORY, img_roc_auc))
+
+            # get optimal threshold
+            gt_mask = np.asarray(gt_mask_list)
+            precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+            a = 2 * precision * recall
+            b = precision + recall
+            f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+            threshold = thresholds[np.argmax(f1)]
+
+            # calculate per-pixel level ROCAUC
+            fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
+            per_pixel_rocauc = roc_auc_score(gt_mask.flatten(), scores.flatten())
+            total_pixel_roc_auc.append(per_pixel_rocauc)
+            print('pixel ROCAUC: %.3f' % (per_pixel_rocauc))
+
+            fig_pixel_rocauc.plot(fpr, tpr, label='%s ROCAUC: %.3f' % (self.config.DATASETS.CATEGORY, per_pixel_rocauc))
+            plot_fig(test_images, scores, gt_mask_list, threshold, self.save_visual_dir, self.config.DATASETS.CATEGORY)
+
+            fig.tight_layout()
+            fig.savefig(os.path.join(self.save_visual_dir, 'roc_curve.png'), dpi=100)
         else:
             self.train_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
             for (images, _, _) in tqdm(self.train_dataloader, f"train `{self.config.DATASETS.CATEGORY}`"):
@@ -149,96 +233,3 @@ class Trainer:
             self.train_features_output = [mean, inv_covariance]
 
             self.save_checkpoint()
-
-        gt_list = []
-        gt_mask_list = []
-        test_imgs = []
-        self.eval_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
-
-        # extract test set features
-        for (images, targets, masks) in tqdm(self.val_dataloader, f"eval `{self.config.DATASETS.CATEGORY}`"):
-            images = images["image"]
-            masks = masks["image"]
-
-            test_imgs.extend(images["image"].cpu().detach().numpy())
-            gt_list.extend(targets.cpu().detach().numpy())
-            gt_mask_list.extend(masks["image"].cpu().detach().numpy())
-            # model prediction
-            if self.device.type == "cuda" and torch.cuda.is_available():
-                images = images.to(self.device, non_blocking=True)
-            features = self.model(images)
-            # get intermediate layer outputs
-            for k, v in features.items():
-                self.eval_features_output[k].append(v)
-
-        # Concatenate the features
-        for k, v in self.eval_features_output.items():
-            self.eval_features_output[k] = torch.cat(v, 0)
-
-        # Embedding concat
-        embedding_vectors = self.eval_features_output[self.config.MODEL.RETURN_NODES[0]]
-        for layer_name in self.config.MODEL.RETURN_NODES[1:]:
-            embedding_vectors = embedding_concat(embedding_vectors, self.eval_features_output[layer_name])
-
-        # randomly select d dimension
-        embedding_vectors = torch.index_select(embedding_vectors, 1, self.idx)
-
-        B, C, H, W = embedding_vectors.size()
-        embedding_vectors = embedding_vectors.view(B, C, H * W).numpy()
-        dist_list = []
-        for i in range(H * W):
-            mean = self.train_features_output[0][:, i]
-            conv_inv = np.linalg.inv(self.train_features_output[1][:, :, i])
-            dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
-            dist_list.append(dist)
-
-        dist_list = np.array(dist_list).transpose(1, 0).reshape(B, H, W)
-
-        # upsample
-        dist_list = torch.tensor(dist_list)
-        score_map = F_torch.interpolate(dist_list.unsqueeze(1), size=images.size(2), mode='bilinear',
-                                        align_corners=False).squeeze().numpy()
-
-        # apply gaussian smoothing on the score map
-        for i in range(score_map.shape[0]):
-            score_map[i] = gaussian_filter(score_map[i], sigma=4)
-
-        # Normalization
-        max_score = score_map.max()
-        min_score = score_map.min()
-        scores = (score_map - min_score) / (max_score - min_score)
-
-        # calculate image-level ROC AUC score
-        fig, ax = plt.subplots(1, 2, figsize=(20, 10))
-        fig_img_rocauc = ax[0]
-        fig_pixel_rocauc = ax[1]
-
-        total_roc_auc = []
-        total_pixel_roc_auc = []
-        img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
-        gt_list = np.asarray(gt_list)
-        fpr, tpr, _ = roc_curve(gt_list, img_scores)
-        img_roc_auc = roc_auc_score(gt_list, img_scores)
-        total_roc_auc.append(img_roc_auc)
-        print('image ROCAUC: %.3f' % (img_roc_auc))
-        fig_img_rocauc.plot(fpr, tpr, label='%s img_ROCAUC: %.3f' % (self.config.DATASETS.CATEGORY, img_roc_auc))
-
-        # get optimal threshold
-        gt_mask = np.asarray(gt_mask_list)
-        precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-        a = 2 * precision * recall
-        b = precision + recall
-        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-        threshold = thresholds[np.argmax(f1)]
-
-        # calculate per-pixel level ROCAUC
-        fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
-        per_pixel_rocauc = roc_auc_score(gt_mask.flatten(), scores.flatten())
-        total_pixel_roc_auc.append(per_pixel_rocauc)
-        print('pixel ROCAUC: %.3f' % (per_pixel_rocauc))
-
-        fig_pixel_rocauc.plot(fpr, tpr, label='%s ROCAUC: %.3f' % (self.config.DATASETS.CATEGORY, per_pixel_rocauc))
-        plot_fig(test_imgs, scores, gt_mask_list, threshold, self.save_visual_dir, self.config.DATASETS.CATEGORY)
-
-        fig.tight_layout()
-        fig.savefig(os.path.join(self.save_visual_dir, 'roc_curve.png'), dpi=100)
