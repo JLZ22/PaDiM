@@ -59,13 +59,13 @@ class Trainer:
         return model
 
     def get_dataloader(self) -> torch.utils.data.DataLoader:
+        print((self.config.DATASETS.TRANSFORMS.RESIZE.HEIGHT, self.config.DATASETS.TRANSFORMS.RESIZE.WIDTH))
+        print((self.config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, self.config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH))
+        print(self.config.DATASETS.TRANSFORMS.NORMALIZE.MEAN)
+        print(self.config.DATASETS.TRANSFORMS.NORMALIZE.STD)
         train_dataset = MVTecDataset(
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
-            (self.config.DATASETS.TRANSFORMS.RESIZE.HEIGHT, self.config.DATASETS.TRANSFORMS.RESIZE.WIDTH),
-            (self.config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, self.config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH),
-            self.config.DATASETS.TRANSFORMS.NORMALIZE.MEAN,
-            self.config.DATASETS.TRANSFORMS.NORMALIZE.STD,
             is_train=True,
         )
         train_dataloader = torch.utils.data.DataLoader(
