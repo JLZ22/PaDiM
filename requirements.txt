@@ -8,3 +8,5 @@ albumentations
 omegaconf
 opencv-python
 tqdm
+scikit-learn
+scipy

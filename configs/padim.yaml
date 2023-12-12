@@ -24,7 +24,7 @@ TRAIN:
     IMGS_PER_BATCH: 32
 
 VAL:
-  WEIGHTS_PATH: ""
+  WEIGHTS_PATH: "./results/train/bottle.pkl"
 
   HYP:
     IMGS_PER_BATCH: 1

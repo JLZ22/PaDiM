@@ -36,13 +36,7 @@ logger = logging.getLogger(__name__)
 class Trainer:
     def __init__(self, config: DictConfig) -> None:
         self.config = config
-
         self.device = select_device(config["DEVICE"])
-        if self.device.type == "cuda":
-            torch.set_float32_matmul_precision("high")
-            self.scaler = amp.GradScaler(enabled=True)
-        else:
-            self.scaler = amp.GradScaler(enabled=False)
 
         self.model = self.create_model()
         self.train_dataloader = self.get_dataloader()
