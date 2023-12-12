@@ -13,9 +13,7 @@
 # ==============================================================================
 import logging
 
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from omegaconf import DictConfig, OmegaConf
+from torchvision import transforms
 
 logger = logging.getLogger(__name__)
 
@@ -24,37 +22,32 @@ __all__ = [
 ]
 
 
-def get_data_transforms(dict_config: DictConfig, mask_mode: bool = False) -> A.Compose:
+def get_data_transforms(
+        image_size: tuple[int, int],
+        center_crop: tuple[int, int],
+        norm_mean: tuple[float],
+        norm_std: tuple[float],
+) -> [transforms.Compose, transforms.Compose]:
     """Get transforms from config or image size.
 
     Args:
-        dict_config (DictConfig): Albumentations transforms.
-            Either config or albumentations ``Compose`` object. Defaults to None.
-        mask_mode (bool, optional): If True, return transforms for mask. Defaults to False.
+        image_size (tuple[int, int]): image size.
+        center_crop (tuple[int, int]): center crop size.
+        norm_mean (tuple[float]): mean value for normalization.
+        norm_std (tuple[float]): std value for normalization.
 
     Returns:
-        A.Compose: Albumentation ``Compose`` object containing the image transforms.
-
-    Examples:
-        >>> dict_config = OmegaConf.load("/tmp/transforms.yaml")
-        >>> dict_config = OmegaConf.create(dict_config)
-        >>> transforms = get_data_transforms(dict_config)
+        [transforms.Compose, transforms.Compose]: image and mask transforms.
     """
-    transforms: A.Compose
-    transforms_list = []
-
-    if dict_config is None:
-        raise ValueError("Not found transform in config.")
-
-    if dict_config.RESIZE is not None:
-        transforms_list.append(A.Resize(dict_config.RESIZE.HEIGHT, dict_config.RESIZE.WIDTH))
-    if dict_config.NORMALIZE is not None and not mask_mode:
-        transforms_list.append(A.Normalize(dict_config.NORMALIZE.MEAN, dict_config.NORMALIZE.STD))
-
-    if len(transforms_list) == 0:
-        raise ValueError("Not found transform in config.")
-
-    transforms_list.append(ToTensorV2())
-    transforms = A.Compose(transforms_list)
-
-    return transforms
+    image_transforms = transforms.Compose([
+        transforms.Resize(image_size),
+        transforms.CenterCrop(center_crop),
+        transforms.ToTensor(),
+        transforms.Normalize(norm_mean, norm_std)
+    ])
+    mask_transforms = transforms.Compose([
+        transforms.Resize(image_size),
+        transforms.CenterCrop(center_crop),
+        transforms.ToTensor(),
+    ])
+    return image_transforms, mask_transforms

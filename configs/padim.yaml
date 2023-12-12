@@ -12,14 +12,15 @@ DATASETS:
   CATEGORY: "bottle"
   TRANSFORMS:
     RESIZE:
-      HEIGHT: 224
-      WIDTH: 224
+      VALUE: 224
+    CENTER_CROP:
+      VALUE: 224
     NORMALIZE:
       MEAN: [0.485, 0.456, 0.406]
       STD: [0.229, 0.224, 0.225]
 
 TRAIN:
-  WEIGHTS_PATH: ""
+  WEIGHTS_PATH: "./results/train/padim-mvtec/bottle.pkl"
 
   HYP:
     IMGS_PER_BATCH: 32
@@ -28,4 +29,4 @@ VAL:
   WEIGHTS_PATH: ""
 
   HYP:
-    IMGS_PER_BATCH: 32
+    IMGS_PER_BATCH: 1

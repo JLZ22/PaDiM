@@ -130,9 +130,6 @@ class Trainer:
 
             # extract test set features
             for (images, targets, masks) in tqdm(self.val_dataloader, f"eval `{self.config.DATASETS.CATEGORY}`"):
-                images = images["image"]
-                masks = masks["image"]
-
                 test_images.extend(images.cpu().detach().numpy())
                 gt_list.extend(targets.cpu().detach().numpy())
                 gt_mask_list.extend(masks.cpu().detach().numpy())
@@ -209,7 +206,6 @@ class Trainer:
         else:
             self.train_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
             for (images, _, _) in tqdm(self.train_dataloader, f"train `{self.config.DATASETS.CATEGORY}`"):
-                images = images["image"]
                 if self.device.type == "cuda" and torch.cuda.is_available():
                     images = images.to(self.device, non_blocking=True)
                 features = self.model(images)

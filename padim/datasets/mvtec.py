@@ -15,14 +15,14 @@ import logging
 import os
 from pathlib import Path
 
-import cv2
 import torch
 import torch.utils.data
+from PIL import Image
 from omegaconf import DictConfig
 
 from padim.utils.download import DownloadInfo
 from padim.utils.transform import get_data_transforms
-from albumentations.pytorch import ToTensorV2
+
 logger = logging.getLogger(__name__)
 
 DOWNLOAD_INFO = DownloadInfo(
@@ -88,10 +88,11 @@ class MVTecDataset(torch.utils.data.Dataset):
         self.is_train = is_train
 
         # set transforms
-        self.transform_image = get_data_transforms(transforms_dict_config, mask_mode=False)
-        self.transform_mask = get_data_transforms(transforms_dict_config, mask_mode=True)
-        self.mask_height = transforms_dict_config.RESIZE.HEIGHT
-        self.mask_width = transforms_dict_config.RESIZE.WIDTH
+        self.image_transforms, self.mask_transforms = get_data_transforms(transforms_dict_config.RESIZE.VALUE,
+                                                                          transforms_dict_config.CENTER_CROP.VALUE,
+                                                                          transforms_dict_config.NORMALIZE.MEAN,
+                                                                          transforms_dict_config.NORMALIZE.STD)
+        self.mask_height, self.mask_width = transforms_dict_config.CENTER_CROP.VALUE, transforms_dict_config.CENTER_CROP.VALUE
 
         # load dataset
         self.images, self.targets, self.masks = self.load()
@@ -128,19 +129,16 @@ class MVTecDataset(torch.utils.data.Dataset):
         return list(images), list(targets), list(masks)
 
     def __getitem__(self, index: int) -> tuple:
-        image = cv2.imread(self.images[index])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = self.transform_image(image=image)
+        image = Image.open(self.images[index]).convert("RGB")
+        image = self.image_transforms(image)
 
         target = self.targets[index]
 
         if self.targets[index] == 0:
             mask = torch.zeros([1, self.mask_height, self.mask_width])
-            mask = {"image": mask}
         else:
-            mask = cv2.imread(self.masks[index])
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
-            mask = self.transform_mask(image=mask)
+            mask = Image.open(self.masks[index])
+            mask = self.mask_transforms(mask)
 
         return image, target, mask
 
