@@ -11,14 +11,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+from typing import Any
+
 import numpy as np
 import torch
+from scipy.ndimage import gaussian_filter
 from scipy.spatial.distance import mahalanobis
 from torch import Tensor
 from torch.nn import functional as F_torch
 
 __all__ = [
-    "calculate_distance_matrix", "cal_multivariate_gaussian_distribution", "de_normalization", "embedding_concat",
+    "calculate_distance_matrix", "cal_multivariate_gaussian_distribution", "generate_embedding", "get_abnormal_score", "de_normalization",
+    "embedding_concat",
 ]
 
 
@@ -43,14 +47,14 @@ def calculate_distance_matrix(embedding: Tensor, stats: list[Tensor]) -> np.ndar
     """
     batch_size, channels, height, width = embedding.size()
     embedding_vectors = embedding.view(batch_size, channels, height * width).numpy()
-    dist_list = []
+    distances = []
     for i in range(height * width):
         mean = stats[0][:, i]
         conv_inv = np.linalg.inv(stats[1][:, :, i])
-        dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
-        dist_list.append(dist)
+        distance = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
+        distances.append(distance)
 
-    distances = np.array(dist_list).transpose(1, 0).reshape(batch_size, height, width)
+    distances = np.array(distances).transpose(1, 0).reshape(batch_size, height, width)
     return distances
 
 
@@ -83,6 +87,39 @@ def cal_multivariate_gaussian_distribution(x: Tensor) -> [np.ndarray, np.ndarray
         inv_covariance[:, :, i] = np.cov(embedding_vectors[:, :, i].numpy(), rowvar=False) + 0.01 * I
 
     return mean, inv_covariance
+
+
+def generate_embedding(features: Tensor | Any, return_nodes: list, index: Tensor) -> Any:
+    # Concatenate the featuresl
+    for k, v in features.items():
+        features[k] = torch.cat(v, 0)
+
+    # Embedding concat
+    embedding = features[return_nodes[0]]
+    for layer_name in return_nodes[1:]:
+        embedding = embedding_concat(embedding, features[layer_name])
+
+    # randomly select d dimension
+    embedding = torch.index_select(embedding, 1, index)
+
+    return embedding
+
+
+def get_abnormal_score(distances: np.ndarray, image_size: int) -> np.ndarray:
+    # up-sample
+    distances = torch.tensor(distances)
+    score_map = F_torch.interpolate(distances.unsqueeze(1), size=(image_size, image_size), mode="bilinear", align_corners=False).squeeze().numpy()
+
+    # apply gaussian smoothing on the score map
+    for i in range(score_map.shape[0]):
+        score_map[i] = gaussian_filter(score_map[i], sigma=4)
+
+    # Normalization
+    max_score = score_map.max()
+    min_score = score_map.min()
+    scores = (score_map - min_score) / (max_score - min_score)
+
+    return scores
 
 
 def de_normalization(

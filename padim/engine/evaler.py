@@ -11,11 +11,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import logging
 import os
 import pickle
 import random
 from collections import OrderedDict
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -23,39 +23,25 @@ import torch
 import torch.utils.data
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig, OmegaConf
-from scipy.ndimage import gaussian_filter
-from scipy.spatial.distance import mahalanobis
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve
-from torch import nn
-from torch.nn import functional as F_torch
+from torch import nn, Tensor
 from tqdm import tqdm
 
 from padim.datasets import MVTecDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
-from padim.utils import plot_fig
-from padim.utils import select_device, embedding_concat
+from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_abnormal_score
+from padim.utils import select_device
+
+logger = logging.getLogger(__name__)
 
 
 class Evaler:
     def __init__(self, config: DictConfig) -> None:
         self.config = config
-        self.device = select_device(config["DEVICE"])
 
-        self.model = self.create_model()
-        self.val_dataloader = self.get_dataloader()
-        self.features = self._get_features(config.VAL.WEIGHTS_PATH)
-
-        max_features = MODEL_MAX_FEATURES[self.config.MODEL.BACKBONE]
-        num_features = MODEL_NUM_FEATURES[self.config.MODEL.BACKBONE]
-        self.idx = torch.tensor(random.sample(range(0, max_features), num_features))
-
-        # Create a folder to save the visual results
-        self.save_visual_dir = os.path.join("results", "train", config.EXP_NAME, "visual")
-        os.makedirs(self.save_visual_dir, exist_ok=True)
-
-    def create_model(self) -> nn.Module:
+    def create_model(self, device: torch.device) -> nn.Module:
         model = PaDiM(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
-        model = model.to(self.device)
+        model = model.to(device)
         return model
 
     def get_dataloader(self) -> torch.utils.data.DataLoader:
@@ -78,78 +64,59 @@ class Evaler:
         )
         return val_dataloader
 
+    def get_features(self) -> Any:
+        weights_path = self.config.VAL.WEIGHTS_PATH
+        if not weights_path.endswith(".pkl"):
+            raise ValueError(f"Only support '.pkl' file, but got {weights_path}")
+
+        with open(weights_path, "rb") as f:
+            features = pickle.load(f)
+
+        return features
+
     @staticmethod
-    def _get_features(path: str | Path) -> Any:
-        if not path.endswith(".pkl"):
-            raise ValueError(f"Invalid weights path: {path}")
-
-        with open(path, "rb") as f:
-            checkpoint = pickle.load(f)
-
-        return checkpoint
-
-    def validation(self) -> None:
+    def run_validation(
+            model: nn.Module,
+            category: str,
+            val_dataloader: torch.utils.data.DataLoader,
+            return_nodes: list,
+            index: Tensor,
+            train_features: list,
+            image_size: int,
+            device: torch.device = torch.device("cpu"),
+            save_visual_dir: str = "results/eval/visual",
+    ) -> None:
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
         fig_image_roc_auc = ax[0]
         fig_pixel_roc_auc = ax[1]
-
         total_roc_auc = []
         total_pixel_roc_auc = []
-
+        test_images = []
         gt_list = []
         gt_mask_list = []
-        test_images = []
 
-        eval_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
-        for (images, targets, masks) in tqdm(self.val_dataloader, f"eval | '{self.config.DATASETS.CATEGORY}'"):
+        eval_features = OrderedDict((layer, []) for layer in return_nodes)
+        # get intermediate layer outputs
+        for (images, targets, masks) in tqdm(val_dataloader, f"eval '{category}'"):
             test_images.extend(images.cpu().detach().numpy())
             gt_list.extend(targets.cpu().detach().numpy())
             gt_mask_list.extend(masks.cpu().detach().numpy())
             # model prediction
-            if self.device.type == "cuda" and torch.cuda.is_available():
-                images = images.to(self.device, non_blocking=True)
-            features = self.model(images)
+            if device.type == "cuda" and torch.cuda.is_available():
+                images = images.to(device, non_blocking=True)
+            feature = model(images)
             # get intermediate layer outputs
-            for k, v in features.items():
-                eval_features_output[k].append(v)
-
-        # Concatenate the features
-        for k, v in eval_features_output.items():
-            eval_features_output[k] = torch.cat(v, 0)
+            for k, v in feature.items():
+                eval_features[k].append(v)
 
         # Embedding concat
-        embedding_vectors = eval_features_output[self.config.MODEL.RETURN_NODES[0]]
-        for layer_name in self.config.MODEL.RETURN_NODES[1:]:
-            embedding_vectors = embedding_concat(embedding_vectors, eval_features_output[layer_name])
-
-        # randomly select d dimension
-        embedding_vectors = torch.index_select(embedding_vectors, 1, self.idx)
+        embedding = generate_embedding(eval_features, return_nodes, index)
 
         # calculate distance matrix
-        B, C, H, W = embedding_vectors.size()
-        embedding_vectors = embedding_vectors.view(B, C, H * W).numpy()
-        dist_list = []
-        for i in range(H * W):
-            mean = self.features[0][:, i]
-            conv_inv = np.linalg.inv(self.features[1][:, :, i])
-            dist = [mahalanobis(sample[:, i], mean, conv_inv) for sample in embedding_vectors]
-            dist_list.append(dist)
-
-        dist_list = np.array(dist_list).transpose(1, 0).reshape(B, H, W)
+        distances = calculate_distance_matrix(embedding, train_features)
 
         # up-sample
-        dist_list = torch.tensor(dist_list)
-        score_map = F_torch.interpolate(dist_list.unsqueeze(1), size=images.size(2), mode="bilinear",
-                                        align_corners=False).squeeze().numpy()
-
-        # apply gaussian smoothing on the score map
-        for i in range(score_map.shape[0]):
-            score_map[i] = gaussian_filter(score_map[i], sigma=4)
-
-        # Normalization
-        max_score = score_map.max()
-        min_score = score_map.min()
-        scores = (score_map - min_score) / (max_score - min_score)
+        scores = get_abnormal_score(distances, image_size)
 
         # calculate image-level ROC AUC score
         image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
@@ -157,8 +124,8 @@ class Evaler:
         fpr, tpr, _ = roc_curve(gt_list, image_scores)
         image_roc_auc = roc_auc_score(gt_list, image_scores)
         total_roc_auc.append(image_roc_auc)
-        print("image ROCAUC: %.3f" % image_roc_auc)
-        fig_image_roc_auc.plot(fpr, tpr, label="%s image_ROCAUC: %.3f" % (self.config.DATASETS.CATEGORY, image_roc_auc))
+        print(f"image ROCAUC: {image_roc_auc:.3f}")
+        fig_image_roc_auc.plot(fpr, tpr, label=f"{category} image_ROCAUC: {image_roc_auc:.3f}")
 
         # get optimal threshold
         gt_mask = np.asarray(gt_mask_list)
@@ -170,12 +137,39 @@ class Evaler:
 
         # calculate per-pixel level ROCAUC
         fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
-        per_pixel_rocauc = roc_auc_score(gt_mask.flatten(), scores.flatten())
-        total_pixel_roc_auc.append(per_pixel_rocauc)
-        print("pixel ROCAUC: %.3f" % (per_pixel_rocauc))
+        per_pixel_roc_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
+        total_pixel_roc_auc.append(per_pixel_roc_auc)
+        print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
 
-        fig_pixel_roc_auc.plot(fpr, tpr, label="%s ROCAUC: %.3f" % (self.config.DATASETS.CATEGORY, per_pixel_rocauc))
-        plot_fig(test_images, scores, gt_mask_list, threshold, self.save_visual_dir, self.config.DATASETS.CATEGORY)
+        fig_pixel_roc_auc.plot(fpr, tpr, label=f"{category} ROCAUC: {per_pixel_roc_auc:.3f}")
+        plot_fig(test_images, scores, gt_mask_list, threshold, save_visual_dir, category)
 
         fig.tight_layout()
-        fig.savefig(os.path.join(self.save_visual_dir, "roc_curve.png"), dpi=100)
+        fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
+
+    def validation(self) -> None:
+        device = select_device(self.config["DEVICE"])
+
+        model = self.create_model(device)
+        val_dataloader = self.get_dataloader()
+        train_features = self.get_features()
+
+        max_features = MODEL_MAX_FEATURES[self.config.MODEL.BACKBONE]
+        num_features = MODEL_NUM_FEATURES[self.config.MODEL.BACKBONE]
+        index = torch.tensor(random.sample(range(0, max_features), num_features))
+
+        # Create a folder to save the visual results
+        save_visual_dir = os.path.join("results", "eval", self.config.EXP_NAME, "visual")
+        os.makedirs(save_visual_dir, exist_ok=True)
+
+        self.run_validation(
+            model,
+            self.config.DATASETS.CATEGORY,
+            val_dataloader,
+            OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
+            index,
+            train_features,
+            self.config.DATASETS.TRANSFORMS.CROP_SIZE,
+            device,
+            save_visual_dir,
+        )

@@ -22,4 +22,4 @@ VAL:
   WEIGHTS_PATH: "./results/train/padim-mvtec/bottle.pkl"
 
   HYP:
-    IMGS_PER_BATCH: 1
+    IMGS_PER_BATCH: 32

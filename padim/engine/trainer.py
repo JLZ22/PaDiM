@@ -21,12 +21,13 @@ from typing import Any
 import torch
 import torch.utils.data
 from omegaconf import DictConfig, OmegaConf
-from torch import nn, Tensor
+from torch import nn
 from tqdm import tqdm
 
 from padim.datasets import MVTecDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
-from padim.utils import select_device, cal_multivariate_gaussian_distribution, embedding_concat
+from padim.utils import select_device, cal_multivariate_gaussian_distribution, generate_embedding
+from .evaler import Evaler
 
 logger = logging.getLogger(__name__)
 
@@ -37,29 +38,44 @@ class Trainer:
         self.device = select_device(config["DEVICE"])
 
         self.model = self.create_model()
-        self.train_dataloader = self.get_dataloader()
+        self.train_dataloader, self.val_dataloader = self.get_dataloader()
 
         max_features = MODEL_MAX_FEATURES[self.config.MODEL.BACKBONE]
         num_features = MODEL_NUM_FEATURES[self.config.MODEL.BACKBONE]
-        self.idx = torch.tensor(random.sample(range(0, max_features), num_features))
+        self.index = torch.tensor(random.sample(range(0, max_features), num_features))
+
+        self.train_features = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
+        self.eval_features = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
+
+        self.evaler = Evaler(config)
 
         # Create a folder to save the model
         save_weights_dir = os.path.join("results", "train", config.EXP_NAME)
         self.save_weights_path = os.path.join(save_weights_dir, f"{self.config.DATASETS.CATEGORY}.pkl")
         os.makedirs(save_weights_dir, exist_ok=True)
+        # Create a folder to save the visual results
+        self.save_visual_dir = os.path.join("results", "eval", self.config.EXP_NAME, "visual")
+        os.makedirs(self.save_visual_dir, exist_ok=True)
 
     def create_model(self) -> nn.Module:
         model = PaDiM(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
         model = model.to(self.device)
         return model
 
-    def get_dataloader(self) -> torch.utils.data.DataLoader:
+    def get_dataloader(self) -> [torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
         train_dataset = MVTecDataset(
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
             self.config.DATASETS.TRANSFORMS.RESIZE,
             self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             is_train=True,
+        )
+        val_dataset = MVTecDataset(
+            self.config.DATASETS.ROOT,
+            self.config.DATASETS.CATEGORY,
+            self.config.DATASETS.TRANSFORMS.RESIZE,
+            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            is_train=False,
         )
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,
@@ -71,42 +87,49 @@ class Trainer:
             drop_last=False,
             persistent_workers=True,
         )
-        return train_dataloader
+        val_dataloader = torch.utils.data.DataLoader(
+            val_dataset,
+            batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
+            shuffle=True,
+            num_workers=4,
+            sampler=None,
+            pin_memory=True,
+            drop_last=False,
+            persistent_workers=True,
+        )
+        return train_dataloader, val_dataloader
 
     def get_features(self) -> Any:
-        features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
-        for (images, _, _) in tqdm(self.train_dataloader, f"get features"):
+        features = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
+        for (images, _, _) in tqdm(self.train_dataloader, f"train '{self.config.DATASETS.CATEGORY}'"):
             if self.device.type == "cuda" and torch.cuda.is_available():
                 images = images.to(self.device, non_blocking=True)
-            features = self.model(images)
+            feature = self.model(images)
             # get intermediate layer outputs
-            for k, v in features.items():
-                features_output[k].append(v)
+            for k, v in feature.items():
+                features[k].append(v)
 
-        return features_output
-
-    def generate_embedding(self, features: Tensor) -> Any:
-        # Concatenate the features
-        for k, v in features.items():
-            features[k] = torch.cat(v, 0)
-
-        # Embedding concat
-        embedding = features[self.config.MODEL.RETURN_NODES[0]]
-        for layer_name in self.config.MODEL.RETURN_NODES[1:]:
-            embedding = embedding_concat(embedding, features[layer_name])
-
-        # randomly select d dimension
-        embedding = torch.index_select(embedding, 1, self.idx)
-
-        return embedding
+        return features
 
     def save_checkpoint(self, state_dict: Any) -> None:
         with open(self.save_weights_path, "wb") as f:
             pickle.dump(state_dict, f)
 
     def train(self) -> None:
-        features = self.get_features()
-        embedding = self.generate_embedding(features)
+        train_features = self.get_features()
+        embedding = generate_embedding(train_features, self.config.MODEL.RETURN_NODES, self.index)
         mean, inv_covariance = cal_multivariate_gaussian_distribution(embedding)
 
         self.save_checkpoint([mean, inv_covariance])
+
+        self.evaler.run_validation(
+            self.model,
+            self.config.DATASETS.CATEGORY,
+            self.val_dataloader,
+            OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
+            self.index,
+            train_features,
+            self.config.DATASETS.TRANSFORMS.CROP_SIZE,
+            self.device,
+            self.save_visual_dir,
+        )
