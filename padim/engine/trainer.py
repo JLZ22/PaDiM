@@ -58,10 +58,10 @@ class Trainer:
 
         # Create a folder to save the model
         save_weights_dir = os.path.join("results", "train", config.EXP_NAME)
-        self.save_weights_path = os.path.join(save_weights_dir, f"{self.config.DATASETS.CATEGORY}.pkl")
+        self.save_weights_path = os.path.join(save_weights_dir, "model.pkl")
         os.makedirs(save_weights_dir, exist_ok=True)
         # Create a folder to save the visual results
-        self.save_visual_dir = os.path.join("results", "train", self.config.EXP_NAME, "visual")
+        self.save_visual_dir = os.path.join("results", "train", config.EXP_NAME, "visual")
         os.makedirs(self.save_visual_dir, exist_ok=True)
 
     def create_model(self) -> nn.Module:

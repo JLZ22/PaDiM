@@ -1,7 +1,7 @@
 PROJECT_NAME: "padim"
-EXP_NAME: "padim-mvtec"
+EXP_NAME: "padim-folder"
 SEED: 42
-DEVICE: "cpu"
+DEVICE: "cuda"
 TASK: "classification"
 
 MODEL:
@@ -21,7 +21,7 @@ TRAIN:
     IMGS_PER_BATCH: 32
 
 VAL:
-  WEIGHTS_PATH: "./results/train/padim-mvtec/bottle.pkl"
+  WEIGHTS_PATH: "./results/train/padim-folder/model.pkl"
 
   HYP:
     IMGS_PER_BATCH: 32
