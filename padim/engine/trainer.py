@@ -45,7 +45,7 @@ class Trainer:
             self.scaler = amp.GradScaler(enabled=False)
 
         self.model = self.create_model()
-        self.train_dataloader, self.val_dataloader = self.get_dataloader()
+        self.train_dataloader = self.get_dataloader()
 
         max_features = MODEL_MAX_FEATURES[self.config.MODEL.BACKBONE]
         num_features = MODEL_NUM_FEATURES[self.config.MODEL.BACKBONE]
@@ -65,18 +65,12 @@ class Trainer:
         model = model.to(self.device)
         return model
 
-    def get_dataloader(self) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    def get_dataloader(self) -> torch.utils.data.DataLoader:
         train_dataset = MVTecDataset(
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
             self.config.DATASETS.TRANSFORMS,
             is_train=True,
-        )
-        val_dataset = MVTecDataset(
-            self.config.DATASETS.ROOT,
-            self.config.DATASETS.CATEGORY,
-            self.config.DATASETS.TRANSFORMS,
-            is_train=False,
         )
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,
@@ -88,17 +82,7 @@ class Trainer:
             drop_last=False,
             persistent_workers=True,
         )
-        val_dataloader = torch.utils.data.DataLoader(
-            val_dataset,
-            batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
-            shuffle=False,
-            num_workers=4,
-            sampler=None,
-            pin_memory=True,
-            drop_last=False,
-            persistent_workers=True,
-        )
-        return train_dataloader, val_dataloader
+        return train_dataloader
 
     def save_checkpoint(self, state_dict: Any) -> None:
         with open(self.save_weights_path, "wb") as f:
