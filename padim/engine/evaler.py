@@ -169,7 +169,7 @@ class Evaler:
             OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
             index,
             train_features,
-            self.config.DATASETS.TRANSFORMS.CROP_SIZE,
+            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             device,
             save_visual_dir,
         )

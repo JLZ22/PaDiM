@@ -129,7 +129,7 @@ class Trainer:
             OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
             self.index,
             train_features,
-            self.config.DATASETS.TRANSFORMS.CROP_SIZE,
+            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             self.device,
             self.save_visual_dir,
         )
