@@ -22,6 +22,7 @@ from omegaconf import DictConfig
 
 from padim.utils.download import DownloadInfo
 from padim.utils.transform import get_data_transforms
+from torchvision import transforms as T
 
 logger = logging.getLogger(__name__)
 
@@ -79,68 +80,78 @@ class MVTecDataset(torch.utils.data.Dataset):
             self,
             root: str | Path,
             category: str,
-            transforms_dict_config: DictConfig,
+            image_size: tuple[int, int],
+            center_crop: tuple[int, int],
+            normalize_mean: tuple[float, float, float],
+            normalize_std: tuple[float, float, float],
             is_train: bool = True,
     ) -> None:
         super().__init__()
         self.root = root
         self.category = category
+        self.image_size = image_size
+        self.center_crop = center_crop
+        self.normalize_mean = normalize_mean
+        self.normalize_std = normalize_std
         self.is_train = is_train
 
         # set transforms
-        self.image_transforms, self.mask_transforms = get_data_transforms(transforms_dict_config.RESIZE.VALUE,
-                                                                          transforms_dict_config.CENTER_CROP.VALUE,
-                                                                          transforms_dict_config.NORMALIZE.MEAN,
-                                                                          transforms_dict_config.NORMALIZE.STD)
-        self.mask_height, self.mask_width = transforms_dict_config.CENTER_CROP.VALUE, transforms_dict_config.CENTER_CROP.VALUE
+        self.image_transforms, self.mask_transforms = get_data_transforms(image_size,
+                                                                          center_crop,
+                                                                          normalize_mean,
+                                                                          normalize_std)
 
         # load dataset
-        self.images, self.targets, self.masks = self.load()
+        self.x, self.y, self.mask = self.load_dataset_folder()
 
-    def load(self):
-        phase = "train" if self.is_train else "test"
-        images, targets, masks = [], [], []
+    def __getitem__(self, idx):
+        x, y, mask = self.x[idx], self.y[idx], self.mask[idx]
 
-        images_dir = os.path.join(self.root, self.category, phase)
-        gt_dir = os.path.join(self.root, self.category, "ground_truth")
+        x = Image.open(x).convert('RGB')
+        x = self.image_transforms(x)
 
-        image_types = sorted(os.listdir(images_dir))
-        for image_type in image_types:
-            # load images
-            image_type_dir = os.path.join(images_dir, image_type)
-            if not os.path.isdir(image_type_dir):
-                continue
-            image_file_path_list = sorted([os.path.join(image_type_dir, f) for f in os.listdir(image_type_dir) if f.endswith(".png")])
-            images.extend(image_file_path_list)
-
-            # load gt labels
-            if image_type == "good":
-                targets.extend([0] * len(image_file_path_list))
-                masks.extend([None] * len(image_file_path_list))
-            else:
-                targets.extend([1] * len(image_file_path_list))
-                gt_type_dir = os.path.join(gt_dir, image_type)
-                image_file_name_list = [os.path.splitext(os.path.basename(f))[0] for f in image_file_path_list]
-                gt_file_path_list = [os.path.join(gt_type_dir, image_fname + "_mask.png") for image_fname in image_file_name_list]
-                masks.extend(gt_file_path_list)
-
-        assert len(images) == len(targets), "number of x and y should be same"
-
-        return list(images), list(targets), list(masks)
-
-    def __getitem__(self, index: int) -> tuple:
-        image = Image.open(self.images[index]).convert("RGB")
-        image = self.image_transforms(image)
-
-        target = self.targets[index]
-
-        if self.targets[index] == 0:
-            mask = torch.zeros([1, self.mask_height, self.mask_width])
+        if y == 0:
+            mask = torch.zeros([1, 224, 224])
         else:
-            mask = Image.open(self.masks[index])
+            mask = Image.open(mask)
             mask = self.mask_transforms(mask)
 
-        return image, target, mask
+        return x, y, mask
 
     def __len__(self):
-        return len(self.images)
+        return len(self.x)
+
+    def load_dataset_folder(self):
+        phase = 'train' if self.is_train else 'test'
+        x, y, mask = [], [], []
+
+        img_dir = os.path.join(self.root, self.category, phase)
+        gt_dir = os.path.join(self.root, self.category, 'ground_truth')
+
+        img_types = sorted(os.listdir(img_dir))
+        for img_type in img_types:
+
+            # load images
+            img_type_dir = os.path.join(img_dir, img_type)
+            if not os.path.isdir(img_type_dir):
+                continue
+            img_fpath_list = sorted([os.path.join(img_type_dir, f)
+                                     for f in os.listdir(img_type_dir)
+                                     if f.endswith('.png')])
+            x.extend(img_fpath_list)
+
+            # load gt labels
+            if img_type == 'good':
+                y.extend([0] * len(img_fpath_list))
+                mask.extend([None] * len(img_fpath_list))
+            else:
+                y.extend([1] * len(img_fpath_list))
+                gt_type_dir = os.path.join(gt_dir, img_type)
+                img_fname_list = [os.path.splitext(os.path.basename(f))[0] for f in img_fpath_list]
+                gt_fpath_list = [os.path.join(gt_type_dir, img_fname + '_mask.png')
+                                 for img_fname in img_fname_list]
+                mask.extend(gt_fpath_list)
+
+        assert len(x) == len(y), 'number of x and y should be same'
+
+        return list(x), list(y), list(mask)

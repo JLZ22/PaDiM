@@ -23,7 +23,6 @@ import torch.utils.data
 from omegaconf import DictConfig
 from omegaconf import OmegaConf
 from torch import nn
-from torch.cuda import amp
 from tqdm import tqdm
 
 from padim.datasets import MVTecDataset
@@ -63,7 +62,10 @@ class Trainer:
         train_dataset = MVTecDataset(
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
-            self.config.DATASETS.TRANSFORMS,
+            (self.config.DATASETS.TRANSFORMS.RESIZE.HEIGHT, self.config.DATASETS.TRANSFORMS.RESIZE.WIDTH),
+            (self.config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, self.config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH),
+            self.config.DATASETS.TRANSFORMS.NORMALIZE.MEAN,
+            self.config.DATASETS.TRANSFORMS.NORMALIZE.STD,
             is_train=True,
         )
         train_dataloader = torch.utils.data.DataLoader(

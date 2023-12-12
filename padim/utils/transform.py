@@ -25,8 +25,8 @@ __all__ = [
 def get_data_transforms(
         image_size: tuple[int, int],
         center_crop: tuple[int, int],
-        norm_mean: tuple[float],
-        norm_std: tuple[float],
+        norm_mean: tuple[float, float, float],
+        norm_std: tuple[float, float, float],
 ) -> [transforms.Compose, transforms.Compose]:
     """Get transforms from config or image size.
 

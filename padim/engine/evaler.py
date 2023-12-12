@@ -62,7 +62,10 @@ class Evaler:
         val_dataset = MVTecDataset(
             self.config.DATASETS.ROOT,
             self.config.DATASETS.CATEGORY,
-            self.config.DATASETS.TRANSFORMS,
+            (self.config.DATASETS.TRANSFORMS.RESIZE.HEIGHT, self.config.DATASETS.TRANSFORMS.RESIZE.WIDTH),
+            (self.config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, self.config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH),
+            self.config.DATASETS.TRANSFORMS.NORMALIZE.MEAN,
+            self.config.DATASETS.TRANSFORMS.NORMALIZE.STD,
             is_train=False,
         )
         val_dataloader = torch.utils.data.DataLoader(
