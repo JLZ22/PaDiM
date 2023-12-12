@@ -21,7 +21,7 @@ from torch import Tensor
 from torch.nn import functional as F_torch
 
 __all__ = [
-    "calculate_distance_matrix", "cal_multivariate_gaussian_distribution", "generate_embedding", "get_abnormal_score", "de_normalization",
+    "calculate_distance_matrix", "cal_multivariate_gaussian_distribution", "generate_embedding", "get_anomaly_map", "de_normalization",
     "embedding_concat",
 ]
 
@@ -105,21 +105,16 @@ def generate_embedding(features: Tensor | Any, return_nodes: list, index: Tensor
     return embedding
 
 
-def get_abnormal_score(distances: np.ndarray, image_size: int) -> np.ndarray:
+def get_anomaly_map(distances: np.ndarray, image_size: int) -> np.ndarray:
     # up-sample
     distances = torch.tensor(distances)
-    score_map = F_torch.interpolate(distances.unsqueeze(1), size=(image_size, image_size), mode="bilinear", align_corners=False).squeeze().numpy()
+    anomaly_map = F_torch.interpolate(distances.unsqueeze(1), size=(image_size, image_size), mode="bilinear", align_corners=False).squeeze().numpy()
 
     # apply gaussian smoothing on the score map
-    for i in range(score_map.shape[0]):
-        score_map[i] = gaussian_filter(score_map[i], sigma=4)
+    for i in range(anomaly_map.shape[0]):
+        anomaly_map[i] = gaussian_filter(anomaly_map[i], sigma=4)
 
-    # Normalization
-    max_score = score_map.max()
-    min_score = score_map.min()
-    scores = (score_map - min_score) / (max_score - min_score)
-
-    return scores
+    return anomaly_map
 
 
 def de_normalization(

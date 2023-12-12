@@ -29,7 +29,7 @@ from tqdm import tqdm
 
 from padim.datasets import MVTecDataset, FolderDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
-from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_abnormal_score, plot_score_map
+from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_anomaly_map, plot_score_map
 from padim.utils import select_device
 
 logger = logging.getLogger(__name__)
@@ -125,14 +125,18 @@ class Evaler:
         distances = calculate_distance_matrix(embedding, train_features)
 
         # up-sample
-        scores = get_abnormal_score(distances, image_size)
+        anomaly_map = get_anomaly_map(distances, image_size)
 
         if task == 0:
             num_images = len(test_image_names[0])
             for i in range(num_images):
                 save_file_name = os.path.join(save_visual_dir, test_image_names[0][i].split(".")[0] + ".png")
-                plot_score_map(test_images[i], scores[i], save_file_name)
+                plot_score_map(test_images[i], anomaly_map[i], save_file_name)
         else:
+            # Normalization
+            max_score = anomaly_map.max()
+            min_score = anomaly_map.min()
+            scores = (anomaly_map - min_score) / (max_score - min_score)
             # calculate image-level ROC AUC score
             image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
             gt_list = np.asarray(gt_list)
