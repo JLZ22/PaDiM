@@ -125,7 +125,7 @@ class Evaler:
             num_images = len(test_image_names[0])
             for i in range(num_images):
                 save_file_name = os.path.join(save_visual_dir, test_image_names[0][i].split(".")[0] + ".png")
-                plot_score_map(test_images[i], scores[i], save_file_name)
+                plot_score_map(test_images[i], scores[i], image_size, save_file_name)
         else:
             # calculate image-level ROC AUC score
             image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
