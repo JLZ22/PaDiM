@@ -90,25 +90,25 @@ class Evaler:
 
     def validation(self) -> None:
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
-        fig_img_rocauc = ax[0]
-        fig_pixel_rocauc = ax[1]
+        fig_image_roc_auc = ax[0]
+        fig_pixel_roc_auc = ax[1]
 
         total_roc_auc = []
         total_pixel_roc_auc = []
 
         gt_list = []
         gt_mask_list = []
-        test_imgs = []
+        test_images = []
 
         eval_features_output = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
-        for (x, y, mask) in tqdm(self.val_dataloader, '| feature extraction | test | %s |' % self.config.DATASETS.CATEGORY):
-            test_imgs.extend(x.cpu().detach().numpy())
-            gt_list.extend(y.cpu().detach().numpy())
-            gt_mask_list.extend(mask.cpu().detach().numpy())
+        for (images, targets, masks) in tqdm(self.val_dataloader, f"eval | '{self.config.DATASETS.CATEGORY}'"):
+            test_images.extend(images.cpu().detach().numpy())
+            gt_list.extend(targets.cpu().detach().numpy())
+            gt_mask_list.extend(masks.cpu().detach().numpy())
             # model prediction
             if self.device.type == "cuda" and torch.cuda.is_available():
-                x = x.to(self.device, non_blocking=True)
-            features = self.model(x)
+                images = images.to(self.device, non_blocking=True)
+            features = self.model(images)
             # get intermediate layer outputs
             for k, v in features.items():
                 eval_features_output[k].append(v)
@@ -137,9 +137,9 @@ class Evaler:
 
         dist_list = np.array(dist_list).transpose(1, 0).reshape(B, H, W)
 
-        # upsample
+        # up-sample
         dist_list = torch.tensor(dist_list)
-        score_map = F_torch.interpolate(dist_list.unsqueeze(1), size=x.size(2), mode='bilinear',
+        score_map = F_torch.interpolate(dist_list.unsqueeze(1), size=images.size(2), mode="bilinear",
                                         align_corners=False).squeeze().numpy()
 
         # apply gaussian smoothing on the score map
@@ -152,13 +152,13 @@ class Evaler:
         scores = (score_map - min_score) / (max_score - min_score)
 
         # calculate image-level ROC AUC score
-        img_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+        image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
         gt_list = np.asarray(gt_list)
-        fpr, tpr, _ = roc_curve(gt_list, img_scores)
-        img_roc_auc = roc_auc_score(gt_list, img_scores)
-        total_roc_auc.append(img_roc_auc)
-        print('image ROCAUC: %.3f' % (img_roc_auc))
-        fig_img_rocauc.plot(fpr, tpr, label='%s img_ROCAUC: %.3f' % (self.config.DATASETS.CATEGORY, img_roc_auc))
+        fpr, tpr, _ = roc_curve(gt_list, image_scores)
+        image_roc_auc = roc_auc_score(gt_list, image_scores)
+        total_roc_auc.append(image_roc_auc)
+        print("image ROCAUC: %.3f" % image_roc_auc)
+        fig_image_roc_auc.plot(fpr, tpr, label="%s image_ROCAUC: %.3f" % (self.config.DATASETS.CATEGORY, image_roc_auc))
 
         # get optimal threshold
         gt_mask = np.asarray(gt_mask_list)
@@ -172,7 +172,10 @@ class Evaler:
         fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
         per_pixel_rocauc = roc_auc_score(gt_mask.flatten(), scores.flatten())
         total_pixel_roc_auc.append(per_pixel_rocauc)
-        print('pixel ROCAUC: %.3f' % (per_pixel_rocauc))
+        print("pixel ROCAUC: %.3f" % (per_pixel_rocauc))
 
-        fig_pixel_rocauc.plot(fpr, tpr, label='%s ROCAUC: %.3f' % (self.config.DATASETS.CATEGORY, per_pixel_rocauc))
-        plot_fig(test_imgs, scores, gt_mask_list, threshold, self.save_visual_dir, self.config.DATASETS.CATEGORY)
+        fig_pixel_roc_auc.plot(fpr, tpr, label="%s ROCAUC: %.3f" % (self.config.DATASETS.CATEGORY, per_pixel_rocauc))
+        plot_fig(test_images, scores, gt_mask_list, threshold, self.save_visual_dir, self.config.DATASETS.CATEGORY)
+
+        fig.tight_layout()
+        fig.savefig(os.path.join(self.save_visual_dir, "roc_curve.png"), dpi=100)
