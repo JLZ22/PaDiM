@@ -14,7 +14,6 @@
 import os
 from pathlib import Path
 
-import cv2
 import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
@@ -43,6 +42,12 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, save_file_path: str | 
     ax_image[0].title.set_text("Image")
     ax_image[1].imshow(heat_map, cmap="jet", alpha=0.5, interpolation="none", norm=norm)
     ax_image[1].title.set_text("Predicted heat map")
+
+    # Add normal score
+    image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+    text = f"score:{image_scores[0] * 100:.1f}%"
+    ax_image[1].text(0.95, 0.95, text, transform=ax_image[1].transAxes, fontsize=10,
+                     verticalalignment='top', horizontalalignment='right', color='white', bbox=dict(facecolor='red', alpha=0.5))
 
     fig_image.savefig(save_file_path, dpi=100)
     plt.close()

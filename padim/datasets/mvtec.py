@@ -109,18 +109,17 @@ class MVTecDataset(torch.utils.data.Dataset):
         ])
 
         # load dataset
-        self.images, self.targets, self.masks, self.image_fname_list = self.load_dataset_folder()
+        self.images, self.targets, self.masks, self.image_name_list = self.load_dataset_folder()
 
     def load_dataset_folder(self):
         phase = "train" if self.is_train else "test"
-        images, targets, masks, image_fname_list = [], [], [], []
+        images, targets, masks, image_name_list = [], [], [], []
 
         image_dir = os.path.join(self.root, self.category, phase)
         gt_dir = os.path.join(self.root, self.category, "ground_truth")
 
         image_types = sorted(os.listdir(image_dir))
         for image_type in image_types:
-
             # load images
             image_type_dir = os.path.join(image_dir, image_type)
             if not os.path.isdir(image_type_dir):
@@ -141,7 +140,7 @@ class MVTecDataset(torch.utils.data.Dataset):
 
         assert len(images) == len(targets), "number of x and y should be same"
 
-        return list(images), list(targets), list(masks), image_fname_list
+        return list(images), list(targets), list(masks), image_name_list
 
     def __getitem__(self, index: int):
         image, target, mask = self.images[index], self.targets[index], self.masks[index]
@@ -155,7 +154,7 @@ class MVTecDataset(torch.utils.data.Dataset):
             mask = Image.open(mask)
             mask = self.mask_transforms(mask)
 
-        return image, target, mask, self.image_fname_list[index]
+        return image, target, mask, self.image_name_list
 
     def __len__(self):
         return len(self.images)
