@@ -50,7 +50,6 @@ class FolderDataset(torch.utils.data.Dataset):
             self,
             root: str | Path,
             image_size: int = 256,
-            center_crop: int = 224,
             normalize_mean: [float, float, float] = None,
             normalize_std: [float, float, float] = None,
     ) -> None:
@@ -62,12 +61,10 @@ class FolderDataset(torch.utils.data.Dataset):
 
         self.root = root
         self.image_size = image_size
-        self.center_crop = center_crop
 
         # set transforms
         self.image_transforms = transforms.Compose([
             transforms.Resize(image_size, InterpolationMode.NEAREST),
-            transforms.CenterCrop(center_crop),
             transforms.ToTensor(),
             transforms.Normalize(normalize_mean, normalize_std),
         ])

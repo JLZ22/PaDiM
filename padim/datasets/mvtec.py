@@ -57,7 +57,6 @@ class MVTecDataset(torch.utils.data.Dataset):
         root (str | Path): root directory of dataset where directory ``mvtec_anomaly_detection`` exists.
         category (str): category name of dataset (``bottle``, ``cable``, ``capsule``, ``carpet``, ``grid``, ``hazelnut``, ``leather``, ``metal_nut``, ``pill``, ``screw``, ``tile``, ``toothbrush``, ``transistor``, ``wood``, ``zipper``).
         image_size (int): image size after resizing.
-        center_crop (int): image size after center cropping.
         normalize_mean (list[float]): mean values for normalization.
         normalize_std (list[float]): std values for normalization.
         is_train (bool, optional): if True, load train dataset, else load test dataset. Defaults to True.
@@ -82,8 +81,7 @@ class MVTecDataset(torch.utils.data.Dataset):
             self,
             root: str | Path,
             category: str,
-            image_size: int = 256,
-            center_crop: int = 224,
+            image_size: int = 224,
             normalize_mean: [float, float, float] = None,
             normalize_std: [float, float, float] = None,
             is_train: bool = True,
@@ -97,19 +95,16 @@ class MVTecDataset(torch.utils.data.Dataset):
         self.root = root
         self.category = category
         self.image_size = image_size
-        self.center_crop = center_crop
         self.is_train = is_train
 
         # set transforms
         self.image_transforms = transforms.Compose([
             transforms.Resize(image_size, InterpolationMode.NEAREST),
-            transforms.CenterCrop(center_crop),
             transforms.ToTensor(),
             transforms.Normalize(normalize_mean, normalize_std),
         ])
         self.mask_transforms = transforms.Compose([
             transforms.Resize(image_size, InterpolationMode.NEAREST),
-            transforms.CenterCrop(center_crop),
             transforms.ToTensor(),
         ])
 
@@ -155,7 +150,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         image = self.image_transforms(image)
 
         if target == 0:
-            mask = torch.zeros([1, self.center_crop, self.center_crop])
+            mask = torch.zeros([1, self.image_size, self.image_size])
         else:
             mask = Image.open(mask)
             mask = self.mask_transforms(mask)

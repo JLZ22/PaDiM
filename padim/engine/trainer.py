@@ -74,26 +74,22 @@ class Trainer:
             train_dataset = FolderDataset(
                 self.config.DATASETS.ROOT.TRAIN,
                 self.config.DATASETS.TRANSFORMS.RESIZE,
-                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             )
             val_dataset = FolderDataset(
                 self.config.DATASETS.ROOT.TEST,
                 self.config.DATASETS.TRANSFORMS.RESIZE,
-                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
             )
         else:
             train_dataset = MVTecDataset(
                 self.config.DATASETS.ROOT,
                 self.config.DATASETS.CATEGORY,
                 self.config.DATASETS.TRANSFORMS.RESIZE,
-                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
                 is_train=True,
             )
             val_dataset = MVTecDataset(
                 self.config.DATASETS.ROOT,
                 self.config.DATASETS.CATEGORY,
                 self.config.DATASETS.TRANSFORMS.RESIZE,
-                self.config.DATASETS.TRANSFORMS.CENTER_CROP,
                 is_train=False,
             )
         train_dataloader = torch.utils.data.DataLoader(
@@ -155,7 +151,7 @@ class Trainer:
             OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
             self.index,
             train_features,
-            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            self.config.DATASETS.TRANSFORMS.RESIZE,
             self.task,
             self.device,
             self.save_visual_dir,

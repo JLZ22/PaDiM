@@ -34,16 +34,15 @@ def plot_score_map(test_image: np.ndarray, scores: np.ndarray, save_file_path: s
     image = test_image
     image = de_normalization(image)
     heat_map = scores * 255
-    fig_image, ax_image = plt.subplots(1, 5, figsize=(12, 3))
+    fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))
     fig_image.subplots_adjust(right=0.9)
     for ax_i in ax_image:
         ax_i.axes.xaxis.set_visible(False)
         ax_i.axes.yaxis.set_visible(False)
     ax_image[0].imshow(image)
     ax_image[0].title.set_text("Image")
-    ax_image[1].imshow(image, cmap="gray", interpolation="none")
-    ax_image[2].imshow(heat_map, cmap="jet", alpha=0.5, interpolation="none", norm=norm)
-    ax_image[2].title.set_text("Predicted heat map")
+    ax_image[1].imshow(heat_map, cmap="jet", alpha=0.5, interpolation="none", norm=norm)
+    ax_image[1].title.set_text("Predicted heat map")
 
     fig_image.savefig(save_file_path, dpi=100)
     plt.close()

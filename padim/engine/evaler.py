@@ -85,7 +85,7 @@ class Evaler:
             image_size: int,
             task: int,
             device: torch.device = torch.device("cpu"),
-            save_visual_dir: str = "results/eval/visual",
+            save_visual_dir: str = "./results/eval/visual",
     ) -> None:
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
         fig_image_roc_auc = ax[0]
@@ -125,7 +125,7 @@ class Evaler:
         if task == 0:
             num_images = len(test_image_names[0])
             for i in range(num_images):
-                save_file_name = os.path.join(save_visual_dir, f"{test_image_names[0][i]}.png")
+                save_file_name = os.path.join(save_visual_dir, test_image_names[0][i])
                 plot_score_map(test_images[i], scores[i], save_file_name)
         else:
             # calculate image-level ROC AUC score
