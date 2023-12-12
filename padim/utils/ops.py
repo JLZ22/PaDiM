@@ -90,7 +90,7 @@ def cal_multivariate_gaussian_distribution(x: Tensor) -> [np.ndarray, np.ndarray
 
 
 def generate_embedding(features: Tensor | Any, return_nodes: list, index: Tensor) -> Any:
-    # Concatenate the featuresl
+    # Concatenate the features
     for k, v in features.items():
         features[k] = torch.cat(v, 0)
 

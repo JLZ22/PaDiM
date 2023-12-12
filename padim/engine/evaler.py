@@ -27,7 +27,7 @@ from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve
 from torch import nn, Tensor
 from tqdm import tqdm
 
-from padim.datasets import MVTecDataset
+from padim.datasets import MVTecDataset, FolderDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
 from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_abnormal_score, plot_score_map
 from padim.utils import select_device
@@ -44,13 +44,19 @@ class Evaler:
         model = model.to(device)
         return model
 
-    def get_dataloader(self) -> torch.utils.data.DataLoader:
-        val_dataset = MVTecDataset(
-            self.config.DATASETS.ROOT,
-            self.config.DATASETS.CATEGORY,
-            self.config.DATASETS.TRANSFORMS.RESIZE,
-            is_train=False,
-        )
+    def get_dataloader(self, task: int) -> torch.utils.data.DataLoader:
+        if task == 0:
+            val_dataset = FolderDataset(
+                self.config.DATASETS.ROOT.TEST,
+                self.config.DATASETS.TRANSFORMS.RESIZE,
+            )
+        else:
+            val_dataset = MVTecDataset(
+                self.config.DATASETS.ROOT,
+                self.config.DATASETS.CATEGORY,
+                self.config.DATASETS.TRANSFORMS.RESIZE,
+                is_train=False,
+            )
         val_dataloader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size=self.config["TRAIN"]["HYP"]["IMGS_PER_BATCH"],
@@ -167,7 +173,7 @@ class Evaler:
             raise ValueError(f"Task '{self.config.TASK}' is not supported.")
 
         model = self.create_model(device)
-        val_dataloader = self.get_dataloader()
+        val_dataloader = self.get_dataloader(task)
         train_features = self.get_features()
 
         max_features = MODEL_MAX_FEATURES[self.config.MODEL.BACKBONE]

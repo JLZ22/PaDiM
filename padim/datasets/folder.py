@@ -69,14 +69,14 @@ class FolderDataset(torch.utils.data.Dataset):
         ])
 
         # load dataset
-        self.images = sorted(os.listdir(self.root))
+        self.image_path_list = sorted(os.listdir(self.root))
 
     def __getitem__(self, index: int) -> tuple[Any, Any, Any, str]:
-        image_path = os.path.join(self.root, self.images[index])
+        image_path = os.path.join(self.root, self.image_path_list[index])
         image = Image.open(image_path).convert("RGB")
         image = self.image_transforms(image)
 
-        return image, image, image, self.images[index]
+        return image, image, image, self.image_path_list[index]
 
     def __len__(self):
-        return len(self.images)
+        return len(self.image_path_list)

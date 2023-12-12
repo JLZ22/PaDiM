@@ -5,8 +5,8 @@ DEVICE: "cuda"
 TASK: "classification"
 
 MODEL:
-  BACKBONE: "resnet18"
-  RETURN_NODES: ["layer1.1.relu_1", "layer2.1.relu_1", "layer3.1.relu_1"]
+  BACKBONE: "wide_resnet50_2"
+  RETURN_NODES: ["layer1.2.relu_2", "layer2.3.relu_2", "layer3.3.relu_2"]
 
 DATASETS:
   ROOT:
