@@ -120,7 +120,7 @@ class Trainer:
 
     def get_features(self) -> Any:
         features = OrderedDict((layer, []) for layer in self.config.MODEL.RETURN_NODES)
-        for (images, _, _) in tqdm(self.train_dataloader, f"train model"):
+        for (images, _, _, _) in tqdm(self.train_dataloader, f"train model"):
             if self.device.type == "cuda" and torch.cuda.is_available():
                 images = images.to(self.device, non_blocking=True)
             feature = self.model(images)
@@ -143,14 +143,20 @@ class Trainer:
 
         self.save_checkpoint(train_features)
 
-        # self.evaler.run_validation(
-        #     self.model,
-        #     self.config.DATASETS.CATEGORY,
-        #     self.val_dataloader,
-        #     OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
-        #     self.index,
-        #     train_features,
-        #     self.config.DATASETS.TRANSFORMS.CENTER_CROP,
-        #     self.device,
-        #     self.save_visual_dir,
-        # )
+        if self.task == 0:
+            category = ""
+        else:
+            category = self.config.DATASETS.CATEGORY
+
+        self.evaler.run_validation(
+            self.model,
+            category,
+            self.val_dataloader,
+            OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
+            self.index,
+            train_features,
+            self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            self.task,
+            self.device,
+            self.save_visual_dir,
+        )

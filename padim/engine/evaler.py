@@ -29,7 +29,7 @@ from tqdm import tqdm
 
 from padim.datasets import MVTecDataset
 from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
-from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_abnormal_score
+from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_abnormal_score, plot_score_map
 from padim.utils import select_device
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ class Evaler:
             index: Tensor,
             train_features: list,
             image_size: int,
+            task: int,
             device: torch.device = torch.device("cpu"),
             save_visual_dir: str = "results/eval/visual",
     ) -> None:
@@ -94,13 +95,15 @@ class Evaler:
         test_images = []
         gt_list = []
         gt_mask_list = []
+        test_image_names = []
 
         eval_features = OrderedDict((layer, []) for layer in return_nodes)
         # get intermediate layer outputs
-        for (images, targets, masks) in tqdm(val_dataloader, f"eval '{category}'"):
+        for (images, targets, masks, image_names) in tqdm(val_dataloader, f"eval"):
             test_images.extend(images.cpu().detach().numpy())
             gt_list.extend(targets.cpu().detach().numpy())
             gt_mask_list.extend(masks.cpu().detach().numpy())
+            test_image_names.append(image_names)
             # model prediction
             if device.type == "cuda" and torch.cuda.is_available():
                 images = images.to(device, non_blocking=True)
@@ -119,37 +122,50 @@ class Evaler:
         # up-sample
         scores = get_abnormal_score(distances, image_size)
 
-        # calculate image-level ROC AUC score
-        image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
-        gt_list = np.asarray(gt_list)
-        fpr, tpr, _ = roc_curve(gt_list, image_scores)
-        image_roc_auc = roc_auc_score(gt_list, image_scores)
-        total_roc_auc.append(image_roc_auc)
-        print(f"image ROCAUC: {image_roc_auc:.3f}")
-        fig_image_roc_auc.plot(fpr, tpr, label=f"{category} image_ROCAUC: {image_roc_auc:.3f}")
+        if task == 0:
+            num_images = len(test_images)
+            for i in range(num_images):
+                save_file_name = os.path.join(save_visual_dir, f"{test_image_names[i]}.png")
+                plot_score_map(test_images[i], scores[i], save_file_name)
+        else:
+            # calculate image-level ROC AUC score
+            image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+            gt_list = np.asarray(gt_list)
+            fpr, tpr, _ = roc_curve(gt_list, image_scores)
+            image_roc_auc = roc_auc_score(gt_list, image_scores)
+            total_roc_auc.append(image_roc_auc)
+            print(f"image ROCAUC: {image_roc_auc:.3f}")
+            fig_image_roc_auc.plot(fpr, tpr, label=f"{category} image_ROCAUC: {image_roc_auc:.3f}")
 
-        # get optimal threshold
-        gt_mask = np.asarray(gt_mask_list)
-        precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-        a = 2 * precision * recall
-        b = precision + recall
-        f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-        threshold = thresholds[np.argmax(f1)]
+            # get optimal threshold
+            gt_mask = np.asarray(gt_mask_list)
+            precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+            a = 2 * precision * recall
+            b = precision + recall
+            f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+            threshold = thresholds[np.argmax(f1)]
 
-        # calculate per-pixel level ROCAUC
-        fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
-        per_pixel_roc_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
-        total_pixel_roc_auc.append(per_pixel_roc_auc)
-        print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
+            # calculate per-pixel level ROCAUC
+            fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
+            per_pixel_roc_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
+            total_pixel_roc_auc.append(per_pixel_roc_auc)
+            print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
 
-        fig_pixel_roc_auc.plot(fpr, tpr, label=f"{category} ROCAUC: {per_pixel_roc_auc:.3f}")
-        plot_fig(test_images, scores, gt_mask_list, threshold, save_visual_dir, category)
+            fig_pixel_roc_auc.plot(fpr, tpr, label=f"{category} ROCAUC: {per_pixel_roc_auc:.3f}")
+            plot_fig(test_images, scores, gt_mask_list, threshold, save_visual_dir, category)
 
-        fig.tight_layout()
-        fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
+            fig.tight_layout()
+            fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
 
     def validation(self) -> None:
         device = select_device(self.config["DEVICE"])
+
+        if self.config.TASK == "classification":
+            task = 0
+        elif self.config.TASK == "segmentation":
+            task = 1
+        else:
+            raise ValueError(f"Task '{self.config.TASK}' is not supported.")
 
         model = self.create_model(device)
         val_dataloader = self.get_dataloader()
@@ -163,14 +179,20 @@ class Evaler:
         save_visual_dir = os.path.join("results", "eval", self.config.EXP_NAME, "visual")
         os.makedirs(save_visual_dir, exist_ok=True)
 
+        if task == 0:
+            category = ""
+        else:
+            category = self.config.DATASETS.CATEGORY
+
         self.run_validation(
             model,
-            self.config.DATASETS.CATEGORY,
+            category,
             val_dataloader,
             OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
             index,
             train_features,
             self.config.DATASETS.TRANSFORMS.CENTER_CROP,
+            task,
             device,
             save_visual_dir,
         )

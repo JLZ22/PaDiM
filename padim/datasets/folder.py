@@ -14,11 +14,10 @@
 import logging
 import os
 from pathlib import Path
-from typing import Tuple, Any
+from typing import Any
 
 import torch.utils.data
 from PIL import Image
-from torch import Tensor
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
@@ -76,12 +75,12 @@ class FolderDataset(torch.utils.data.Dataset):
         # load dataset
         self.images = sorted(os.listdir(self.root))
 
-    def __getitem__(self, index: int) -> tuple[Any, Any, Any]:
+    def __getitem__(self, index: int) -> tuple[Any, Any, Any, str]:
         image_path = os.path.join(self.root, self.images[index])
         image = Image.open(image_path).convert("RGB")
         image = self.image_transforms(image)
 
-        return image, image, image
+        return image, image, image, self.images[index]
 
     def __len__(self):
         return len(self.images)
