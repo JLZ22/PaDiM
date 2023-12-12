@@ -21,8 +21,7 @@ from PIL import Image
 from omegaconf import DictConfig
 
 from padim.utils.download import DownloadInfo
-from padim.utils.transform import get_data_transforms
-from torchvision import transforms as T
+from torchvision import transforms
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,6 @@ class MVTecDataset(torch.utils.data.Dataset):
     Args:
         root (str | Path): root directory of dataset where directory ``mvtec_anomaly_detection`` exists.
         category (str): category name of dataset (``bottle``, ``cable``, ``capsule``, ``carpet``, ``grid``, ``hazelnut``, ``leather``, ``metal_nut``, ``pill``, ``screw``, ``tile``, ``toothbrush``, ``transistor``, ``wood``, ``zipper``).
-        transforms_dict_config (DictConfig): transforms config for image and mask.
         is_train (bool, optional): if True, load train dataset, else load test dataset. Defaults to True.
 
     Examples:
@@ -96,10 +94,17 @@ class MVTecDataset(torch.utils.data.Dataset):
         self.is_train = is_train
 
         # set transforms
-        self.image_transforms, self.mask_transforms = get_data_transforms(image_size,
-                                                                          center_crop,
-                                                                          normalize_mean,
-                                                                          normalize_std)
+        self.image_transforms = transforms.Compose([
+            transforms.Resize(self.image_size),
+            transforms.CenterCrop(self.center_crop),
+            transforms.ToTensor(),
+            transforms.Normalize(self.normalize_mean, self.normalize_std),
+        ])
+        self.mask_transforms = transforms.Compose([
+            transforms.Resize(self.image_size),
+            transforms.CenterCrop(self.center_crop),
+            transforms.ToTensor(),
+        ])
 
         # load dataset
         self.x, self.y, self.mask = self.load_dataset_folder()
