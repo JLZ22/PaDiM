@@ -25,7 +25,7 @@ from torch import nn
 from tqdm import tqdm
 
 from padim.datasets import MVTecDataset, FolderDataset
-from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
+from padim.models import PaDiMModel, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
 from padim.utils import select_device, cal_multivariate_gaussian_distribution, generate_embedding
 from .evaler import Evaler
 
@@ -65,7 +65,7 @@ class Trainer:
         os.makedirs(self.save_visual_dir, exist_ok=True)
 
     def create_model(self) -> nn.Module:
-        model = PaDiM(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
+        model = PaDiMModel(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
         model = model.to(self.device)
         return model
 

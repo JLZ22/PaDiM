@@ -28,7 +28,7 @@ from torch import nn, Tensor
 from tqdm import tqdm
 
 from padim.datasets import MVTecDataset, FolderDataset
-from padim.models import PaDiM, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
+from padim.models import PaDiMModel, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
 from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_anomaly_map, plot_score_map
 from padim.utils import select_device
 
@@ -40,7 +40,7 @@ class Evaler:
         self.config = config
 
     def create_model(self, device: torch.device) -> nn.Module:
-        model = PaDiM(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
+        model = PaDiMModel(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
         model = model.to(device)
         return model
 

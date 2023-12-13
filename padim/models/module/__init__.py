@@ -11,4 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+from .anomaly_map import AnomalyMap
 from .feature_extractor import FeatureExtractor
+from .multi_variate_gaussian import MultiVariateGaussian
