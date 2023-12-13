@@ -11,6 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""
+Based on 'albumentations' formulation of data transformation method
+"""
 import logging
 
 import albumentations as A

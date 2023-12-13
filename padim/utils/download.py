@@ -11,6 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""
+Basic implementation of download function
+"""
 import hashlib
 import logging
 import re
@@ -28,6 +31,12 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "DownloadInfo", "DownloadProgressBar", "download_and_extract",
+]
+
+UNSAFE_PATTERNS = ["/etc/", "/root/"]
+
 
 @dataclass
 class DownloadInfo:
@@ -41,7 +50,8 @@ class DownloadInfo:
 class DownloadProgressBar(tqdm):
     r"""Create progress bar for urlretrieve. Subclasses `tqdm`.
 
-    For information about the parameters in constructor, refer to `tqdm`'s documentation.
+        References:
+            For information about the parameters in constructor, refer to `tqdm`'s documentation.
     """
 
     def __init__(self, **kwargs):
@@ -51,34 +61,45 @@ class DownloadProgressBar(tqdm):
     def update_to(self, chunk_number: int = 1, max_chunk_size: int = 1, total_size: int | float = None) -> None:
         r"""Progress bar hook for tqdm.
 
-        Modified from 'https://github.com/tqdm/tqdm#hooks-and-callbacks'
-
         Args:
             chunk_number (int, optional): The current chunk being processed. Defaults to 1.
             max_chunk_size (int, optional): Maximum size of each chunk. Defaults to 1.
             total_size ([type], optional): Total download size. Defaults to None.
+
+        References:
+            https://github.com/tqdm/tqdm#hooks-and-callbacks
         """
         if total_size is not None:
             self.total = total_size
         self.update(chunk_number * max_chunk_size - self.n)
 
 
-def _is_file_potentially_dangerous(fname: str) -> bool:
+def _is_file_potentially_dangerous(file_name: str) -> bool:
     r"""Check if a file is potentially dangerous.
 
     Args:
-        fname (str): Filename.
+        file_name (str): Filename.
 
     Returns:
         bool: True if the member is potentially dangerous, False otherwise.
-
     """
-    # Some example criteria. We could expand this.
-    unsafe_patterns = ["/etc/", "/root/"]
-    for pattern in unsafe_patterns:
-        if re.search(pattern, fname):
-            return True
-    return False
+    return any(re.search(pattern, file_name) for pattern in UNSAFE_PATTERNS)
+
+
+def _is_within_directory(directory: Path, target: Path) -> bool:
+    r"""Checks if a target path is located within a given directory.
+
+    Args:
+        directory (Path): path of the parent directory
+        target (Path): path of the target
+    Returns:
+        (bool): True if the target is within the directory, False otherwise
+    """
+    try:
+        target.relative_to(directory)
+        return True
+    except ValueError:
+        return False
 
 
 def _calculate_md5(file_path: Path) -> str:
@@ -90,8 +111,11 @@ def _calculate_md5(file_path: Path) -> str:
     Returns:
         str: The MD5 hash of the file.
     """
-    with file_path.open("rb") as hash_file:
-        return hashlib.new(name="md5", data=hash_file.read(), usedforsecurity=False).hexdigest()
+    hash_md5 = hashlib.md5()
+    with file_path.open("rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
 
 
 def _hash_check(file_path: Path, expected_hash: str) -> None:
@@ -105,6 +129,12 @@ def _hash_check(file_path: Path, expected_hash: str) -> None:
 
 
 def _extract_zip(file_name: Path, root: Path) -> None:
+    """Extract a zip file.
+
+    Args:
+        file_name (Path): Path of the file to be extracted.
+        root (Path): Root directory where the dataset will be stored.
+    """
     with ZipFile(file_name, "r") as zip_file:
         for file_info in zip_file.infolist():
             if not _is_file_potentially_dangerous(file_info.filename):
@@ -112,6 +142,12 @@ def _extract_zip(file_name: Path, root: Path) -> None:
 
 
 def _extract_tar(file_name: Path, root: Path) -> None:
+    r"""Extract a tar file.
+
+    Args:
+        file_name (Path): Path of the file to be extracted.
+        root (Path): Root directory where the dataset will be stored.
+    """
     with tarfile.open(file_name) as tar_file:
         members = tar_file.getmembers()
         safe_members = [member for member in members if not _is_file_potentially_dangerous(member.name)]
@@ -125,7 +161,6 @@ def _extract(file_name: Path, root: Path) -> None:
     Args:
         file_name (Path): Path of the file to be extracted.
         root (Path): Root directory where the dataset will be stored.
-
     """
     logger.info("Extracting dataset into root folder.")
 
@@ -160,8 +195,8 @@ def download_and_extract(root: Path, info: DownloadInfo) -> None:
     else:
         logger.info("Downloading the %s dataset.", info.name)
         with DownloadProgressBar(unit="B", unit_scale=True, miniters=1, desc=info.name) as progress_bar:
-            urlretrieve(  # nosec - suppress bandit warning (urls are hardcoded)
-                url=f"{info.url}",
+            urlretrieve(
+                url=info.url,
                 filename=downloaded_file_path,
                 reporthook=progress_bar.update_to,
             )
@@ -169,19 +204,3 @@ def download_and_extract(root: Path, info: DownloadInfo) -> None:
         _hash_check(downloaded_file_path, info.hash)
 
     _extract(downloaded_file_path, root)
-
-
-def _is_within_directory(directory: Path, target: Path) -> bool:
-    r"""Checks if a target path is located within a given directory.
-
-    Args:
-        directory (Path): path of the parent directory
-        target (Path): path of the target
-    Returns:
-        (bool): True if the target is within the directory, False otherwise
-    """
-    try:
-        target.relative_to(directory)
-        return True
-    except ValueError:
-        return False

@@ -11,6 +11,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""
+Initialize all seeds to facilitate reproduction
+"""
 import logging
 import os
 import random
