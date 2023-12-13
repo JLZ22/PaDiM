@@ -95,18 +95,18 @@ class MVTecDataset(torch.utils.data.Dataset):
             self.download()
 
         # load dataset
-        self.image_list, self.target_list, self.mask_list = self.load()
+        self.image_path_list, self.target_type_list, self.mask_path_list = self.load()
 
     def __getitem__(self, index: int) -> dict[str, str | int | Tensor | Any]:
-        image_path = self.image_list[index]
-        target = self.target_list[index]
-        mask_path = self.mask_list[index]
+        image_path = self.image_path_list[index]
+        target_type = self.target_type_list[index]
+        mask_path = self.mask_path_list[index]
 
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = self.image_transforms(image=image)["image"]
 
-        if target == 0:
+        if target_type == 0:
             mask = torch.zeros([1, self.mask_size[0], self.mask_size[1]])
         else:
             mask = cv2.imread(mask_path)
@@ -114,12 +114,12 @@ class MVTecDataset(torch.utils.data.Dataset):
             mask = self.image_transforms(image=mask)["image"]
 
         return {"image": image,
-                "target": target,
+                "target": target_type,
                 "mask": mask,
                 "image_path": image_path}
 
     def __len__(self):
-        return len(self.image_list)
+        return len(self.image_path_list)
 
     def download(self) -> None:
         if self.root.is_dir():

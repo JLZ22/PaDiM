@@ -13,7 +13,12 @@ DATASETS:
     TRAIN: "./data/folder/train"
     TEST: "./data/folder/test"
   TRANSFORMS:
-    RESIZE: 224
+    RESIZE:
+      HEIGHT: 224
+      WIDTH: 224
+    CENTER_CROP:
+      HEIGHT: 224
+      WIDTH: 224
 
 TRAIN:
   HYP:
