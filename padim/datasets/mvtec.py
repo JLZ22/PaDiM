@@ -82,6 +82,7 @@ class MVTecDataset(torch.utils.data.Dataset):
             root: str | Path,
             category: str,
             image_size: int = 224,
+            center_crop: int = 224,
             normalize_mean: [float, float, float] = None,
             normalize_std: [float, float, float] = None,
             is_train: bool = True,
