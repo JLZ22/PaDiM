@@ -105,6 +105,7 @@ class MVTecDataset(torch.utils.data.Dataset):
 
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = image.astype("float32") / 255.0
         image = self.image_transforms(image=image)["image"]
 
         if target_type == 0:
@@ -112,6 +113,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         else:
             mask = cv2.imread(mask_path)
             mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
+            mask = mask.astype("float32") / 255.0
             mask = self.image_transforms(image=mask)["image"]
 
         return {"image": image,
@@ -153,8 +155,8 @@ class MVTecDataset(torch.utils.data.Dataset):
             else:
                 target_list.extend([1] * len(image_file_path_list))
                 ground_truth_type_dir = os.path.join(ground_truth_dir, image_type)
-                ground_truth_file_path_list = [os.path.join(ground_truth_type_dir, image_file_name + "_mask.png") for image_file_name in
-                                               image_file_path_list]
+                image_file_name_list = [os.path.splitext(os.path.basename(f))[0] for f in image_file_path_list]
+                ground_truth_file_path_list = [os.path.join(ground_truth_type_dir, img_fname + "_mask.png") for img_fname in image_file_name_list]
                 mask_list.extend(ground_truth_file_path_list)
 
         assert len(image_list) == len(target_list), "number of x and y should be same"

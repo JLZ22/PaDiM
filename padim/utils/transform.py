@@ -41,15 +41,13 @@ def get_data_transform(transform_dict: DictConfig) -> list:
     normalize_transform = transform_dict.get("NORMALIZE", {})
 
     if resize_transform:
-        transform_list.append(A.Resize(resize_transform.get("HEIGHT"), resize_transform.get("WIDTH"),
-                                       interpolation=cv2.INTER_NEAREST,
-                                       always_apply=True))
+        transform_list.append(A.Resize(resize_transform.get("HEIGHT"), resize_transform.get("WIDTH"), cv2.INTER_NEAREST))
 
     if center_crop_transform:
-        transform_list.append(A.CenterCrop(center_crop_transform.get("HEIGHT"), center_crop_transform.get("WIDTH"), always_apply=True))
+        transform_list.append(A.CenterCrop(center_crop_transform.get("HEIGHT"), center_crop_transform.get("WIDTH")))
 
     if normalize_transform:
-        transform_list.append(A.Normalize(normalize_transform.get("MEAN"), normalize_transform.get("STD"), always_apply=True))
+        transform_list.append(A.Normalize(normalize_transform.get("MEAN"), normalize_transform.get("STD"), 1.0))
 
     transform_list.append(ToTensorV2())
     logger.info(f"transform_list: {transform_list}")

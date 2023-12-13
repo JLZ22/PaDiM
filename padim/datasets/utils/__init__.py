@@ -11,9 +11,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .common import *
-from .download import *
-from .ops import *
-from .plots import *
-from .seed import *
-from .transform import *
+from .prefetcher import CPUPrefetcher, CUDAPrefetcher, PrefetchDataLoader, PrefetchGenerator
+
+__all__ = [
+    "PrefetchGenerator", "PrefetchDataLoader", "CPUPrefetcher", "CUDAPrefetcher"
+]

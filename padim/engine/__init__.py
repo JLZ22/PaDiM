@@ -12,5 +12,5 @@
 # limitations under the License.
 # ==============================================================================
 # from .evaler import *
-from .trainer2 import *
 from .base import *
+from .trainer import *
