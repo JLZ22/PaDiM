@@ -193,7 +193,7 @@ def download_and_extract(root: Path, info: DownloadInfo) -> None:
     if downloaded_file_path.exists():
         logger.info("Existing dataset archive found. Skipping download stage.")
     else:
-        logger.info("Downloading the %s dataset.", info.name)
+        logger.info(f"Downloading the {info.name} dataset.")
         with DownloadProgressBar(unit="B", unit_scale=True, miniters=1, desc=info.name) as progress_bar:
             urlretrieve(
                 url=info.url,
