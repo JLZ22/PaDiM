@@ -11,9 +11,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import logging
+
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from omegaconf import DictConfig
+
+logger = logging.getLogger(__name__)
 
 
 def get_data_transform(transform_dict: DictConfig) -> A.Compose:
@@ -25,6 +29,7 @@ def get_data_transform(transform_dict: DictConfig) -> A.Compose:
     Returns:
         A.Compose: data transform.
     """
+    logger.info(f"transform_dict: {transform_dict}")
     transform: A.Compose
     transform_list = []
 

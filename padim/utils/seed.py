@@ -11,6 +11,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import logging
+import os
 import random
 
 import numpy as np
@@ -20,10 +22,71 @@ __all__ = [
     "init_seed",
 ]
 
+logger = logging.getLogger(__name__)
 
-def init_seed(seed: int) -> None:
-    # Fixed random seed for reproducibility
+
+def init_seed(seed: int = None) -> None:
+    r"""Fixed random seed for reproducibility
+
+    Args:
+        seed: random seed
+
+    References:
+        https://github.com/Lightning-AI/pytorch-lightning/blob/1.0.5/pytorch_lightning/utilities/seed.py
+
+    Examples:
+        >>> init_seed(42)
+        >>> init_seed()
+
+    Raise:
+        TypeError: if seed is not int
+        ValueError: if seed is not in bounds
+
+    Note:
+        This function sets the random seed of the following libraries:
+        - :mod:`random`
+        - :mod:`numpy`
+        - :mod:`torch`
+        - :mod:`torch.cuda`
+
+    Returns:
+        None
+    """
+    max_seed_value = np.iinfo(np.uint32).max
+    min_seed_value = np.iinfo(np.uint32).min
+
+    try:
+        if seed is None:
+            seed = os.environ.get("PL_GLOBAL_SEED", _select_seed_randomly(min_seed_value, max_seed_value))
+        seed = int(seed)
+    except (TypeError, ValueError):
+        seed = _select_seed_randomly(min_seed_value, max_seed_value)
+
+    if (seed > max_seed_value) or (seed < min_seed_value):
+        logger.warning(f"{seed} is not in bounds, numpy accepts from {min_seed_value} to {max_seed_value}")
+        seed = _select_seed_randomly(min_seed_value, max_seed_value)
+
+    logger.info(f"Set random seed to {seed}")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
+
+def _select_seed_randomly(min_seed_value: int = 0, max_seed_value: int = 255) -> int:
+    r"""Select a random seed in the correct range
+
+    Args:
+        min_seed_value: minimum value of seed
+        max_seed_value: maximum value of seed
+
+    Examples:
+        >>> _select_seed_randomly()
+        42
+
+    Returns:
+        int: random seed
+    """
+    seed = random.randint(min_seed_value, max_seed_value)
+    logger.warning(f"No correct seed found, seed set to {seed}")
+    return seed
