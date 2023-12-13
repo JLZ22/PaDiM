@@ -10,3 +10,5 @@ opencv-python
 tqdm
 scikit-learn
 scipy
+torchmetrics
+kornia

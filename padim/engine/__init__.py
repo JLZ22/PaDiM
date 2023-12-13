@@ -11,6 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-# from .evaler import *
 from .base import *
+from .evaler import *
 from .trainer import *

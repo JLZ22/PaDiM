@@ -26,9 +26,9 @@ class PaDiM(nn.Module):
 
     Args:
         backbone (str): The backbone of the feature extractor.
-        image_size (tuple[int, int]): The input image size.
         return_nodes (list[str]): The nodes to return from the feature extractor.
         pretrained (bool): Whether to use pretrained weights for the feature extractor.
+        image_size (tuple[int, int], optional): The input image size. Default: (224, 224)
 
     Raises:
         ValueError: If the backbone is not supported.
@@ -55,9 +55,9 @@ class PaDiM(nn.Module):
     def __init__(
             self,
             backbone: str,
-            image_size: tuple[int, int],
             return_nodes: ListConfig | list[str],
             pretrained: bool = True,
+            image_size: tuple[int, int] = (224, 224)
     ) -> None:
         super().__init__()
         if isinstance(return_nodes, ListConfig):
@@ -81,8 +81,7 @@ class PaDiM(nn.Module):
         if self.training:
             return embeddings
         else:
-            mean, inv_covariance = self.multi_variate_gaussian(embeddings)
-            return self.anomaly_map(embeddings, mean, inv_covariance)
+            return self.anomaly_map(embeddings, self.multi_variate_gaussian.mean, self.multi_variate_gaussian.inv_covariance)
 
     def generate_embedding(self, features: dict[str, Tensor]) -> Tensor:
         """Generate embedding from hierarchical feature map.

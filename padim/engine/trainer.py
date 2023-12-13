@@ -12,10 +12,10 @@
 # limitations under the License.
 # ==============================================================================
 import logging
-import os
 import time
 from abc import ABC
 from copy import deepcopy
+from pathlib import Path
 
 import albumentations as A
 import torch
@@ -42,9 +42,18 @@ class Trainer(Base, ABC):
         if self.config.TASK == "classification":
             self.cls_task = True
 
-        self.image_transforms, self.mask_transforms, self.mask_size = self.get_transform(self.config.DATASETS.TRANSFORMS)
+        transforms_dict = self.config.DATASETS.TRANSFORMS
+        self.image_transforms, self.mask_transforms = self.get_transform(transforms_dict)
+        if transforms_dict.get("RESIZE") is not None:
+            mask_size = (transforms_dict.RESIZE.get("HEIGHT"), transforms_dict.RESIZE.get("WIDTH"))
+        elif transforms_dict.get("CENTER_CROP") is not None:
+            mask_size = (transforms_dict.CENTER_CROP.get("HEIGHT"), transforms_dict.CENTER_CROP.get("WIDTH"))
+        else:
+            logger.error("Please specify the size of the mask.")
+            return
+        self.mask_size = mask_size
         self.model = self.create_model()
-        self.train_dataloader, self.val_dataloader = self.get_dataloader()
+        self.train_loader, self.val_loader = self.get_loader()
 
         self.stats: list[Tensor] = []
         self.embeddings: list[Tensor] = []
@@ -52,38 +61,31 @@ class Trainer(Base, ABC):
         # self.evaler = Evaler(config)
 
         # Create a folder to save the model
-        save_weights_dir = os.path.join("results", "train", config.EXP_NAME)
-        self.save_weights_path = os.path.join(save_weights_dir, "model.pkl")
-        os.makedirs(save_weights_dir, exist_ok=True)
+        save_weights_dir = Path("results", "train", config.EXP_NAME)
+        save_weights_dir.mkdir(exist_ok=True, parents=True)
+        self.save_weights_path = Path(save_weights_dir, "model.pkl")
         # Create a folder to save the visual results
-        self.save_visual_dir = os.path.join("results", "train", config.EXP_NAME, "visual")
-        os.makedirs(self.save_visual_dir, exist_ok=True)
+        self.save_visual_dir = Path("results", "train", config.EXP_NAME, "visual")
+        self.save_visual_dir.mkdir(exist_ok=True, parents=True)
 
     def create_model(self) -> nn.Module:
         """Create a model."""
         logger.info(f"Create model: {self.config.MODEL.BACKBONE}")
-        model = PaDiM(self.config.MODEL.BACKBONE, self.mask_size, self.config.MODEL.RETURN_NODES)
+        model = PaDiM(self.config.MODEL.BACKBONE, self.config.MODEL.RETURN_NODES, image_size=self.mask_size)
         model = model.to(self.device)
         return model
 
-    def get_transform(self, transforms_list: DictConfig) -> [A.Compose, A.Compose, tuple[int, int]]:
-        """Get the dataloader for training and validation."""
+    def get_transform(self, transforms_list: DictConfig) -> [A.Compose, A.Compose]:
+        """Get the loader for training and validation."""
         image_transforms_list = get_data_transform(transforms_list)
         mask_transforms_list = image_transforms_list.copy()
         image_transforms = A.Compose(image_transforms_list)
         mask_transforms = A.Compose(mask_transforms_list)
         mask_transforms_list.pop(-2)  # Remove the normalization transform
-        if transforms_list.get("RESIZE") is not None:
-            mask_size = (transforms_list.RESIZE.get("HEIGHT"), transforms_list.RESIZE.get("WIDTH"))
-        elif transforms_list.get("CENTER_CROP") is not None:
-            mask_size = (transforms_list.CENTER_CROP.get("HEIGHT"), transforms_list.CENTER_CROP.get("WIDTH"))
-        else:
-            logger.error("Please specify the size of the mask.")
-            return
 
-        return image_transforms, mask_transforms, mask_size
+        return image_transforms, mask_transforms
 
-    def get_dataloader(self) -> [torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    def get_loader(self) -> [CPUPrefetcher | CUDAPrefetcher, CPUPrefetcher | CUDAPrefetcher]:
         if self.cls_task:
             logger.info("Load classification dataset.")
             train_dataset = FolderDataset(
@@ -115,7 +117,7 @@ class Trainer(Base, ABC):
                 train=False,
             )
 
-        train_dataloader = torch.utils.data.DataLoader(
+        train_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=self.config["TRAIN"]["HYP"]["IMGS_PER_BATCH"],
             shuffle=True,
@@ -125,7 +127,7 @@ class Trainer(Base, ABC):
             drop_last=False,
             persistent_workers=True,
         )
-        val_dataloader = torch.utils.data.DataLoader(
+        val_loader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
             shuffle=False,
@@ -137,25 +139,25 @@ class Trainer(Base, ABC):
         )
 
         if self.device == "cuda":
-            train_dataloader = CUDAPrefetcher(train_dataloader, self.device)
-            val_dataloader = CUDAPrefetcher(val_dataloader, self.device)
+            train_loader = CUDAPrefetcher(train_loader, self.device)
+            val_loader = CUDAPrefetcher(val_loader, self.device)
         else:
-            train_dataloader = CPUPrefetcher(train_dataloader)
-            val_dataloader = CPUPrefetcher(val_dataloader)
+            train_loader = CPUPrefetcher(train_loader)
+            val_loader = CPUPrefetcher(val_loader)
 
-        return train_dataloader, val_dataloader
+        return train_loader, val_loader
 
-    def get_features(self) -> None:
+    def get_embeddings(self) -> None:
         """Get features from the backbone network."""
         batch_time = AverageMeter("Time", ":6.3f")
         data_time = AverageMeter("Data", ":6.3f")
-        progress = ProgressMeter(len(self.train_dataloader), [batch_time, data_time], prefix="Get features ")
+        progress = ProgressMeter(len(self.train_loader), [batch_time, data_time], prefix="Get features ")
 
         end = time.time()
-        for i, data in enumerate(self.train_dataloader):
+        for i, batch_data in enumerate(self.train_loader):
             # measure data loading time
             data_time.update(time.time() - end)
-            image = data["image"].to(self.device, non_blocking=True)
+            image = batch_data["image"].to(self.device, non_blocking=True)
 
             embedding = self.model(image)
             self.embeddings.append(embedding)
@@ -179,12 +181,15 @@ class Trainer(Base, ABC):
         torch.save({
             "model": deepcopy(self.model).half(),
             "stats": self.stats,
+            "image_transforms": self.image_transforms,
+            "mask_transforms": self.mask_transforms,
+            "mask_size": self.mask_size,
             "config": self.config,
         }, self.save_weights_path)
-        logger.info(f"Save the model to {self.save_weights_path}.")
+        logger.info(f"Save the model to '{self.save_weights_path}'.")
 
     def train(self) -> None:
-        self.get_features()
+        self.get_embeddings()
         self.compute_patch_distribution()
         self.save_checkpoint()
 
@@ -196,7 +201,7 @@ class Trainer(Base, ABC):
         # self.evaler.run_validation(
         #     self.model,
         #     category,
-        #     self.val_dataloader,
+        #     self.val_loader,
         #     OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
         #     self.index,
         #     train_features,

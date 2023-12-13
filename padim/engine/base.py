@@ -25,22 +25,21 @@
 # limitations under the License.
 # ==============================================================================
 import logging
-
-from abc import ABC, abstractmethod
-from omegaconf import DictConfig
+from abc import abstractmethod, ABC
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class Base(ABC):
     @abstractmethod
-    def create_model(self):
+    def create_model(self, **kwargs) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    def get_transform(self, transforms_list: DictConfig):
+    def get_transform(self, **kwargs) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    def get_dataloader(self):
+    def get_loader(self, **kwargs) -> Any:
         raise NotImplementedError

@@ -13,24 +13,21 @@
 # ==============================================================================
 import logging
 import os
-import pickle
-import random
-from collections import OrderedDict
 from typing import Any
 
+import albumentations as A
 import numpy as np
 import torch
 import torch.utils.data
 from matplotlib import pyplot as plt
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve
 from torch import nn, Tensor
-from tqdm import tqdm
 
-from padim.datasets import MVTecDataset, FolderDataset
-from padim.models import PaDiMModel, MODEL_NUM_FEATURES, MODEL_MAX_FEATURES
-from padim.utils import plot_fig, calculate_distance_matrix, generate_embedding, get_anomaly_map, plot_score_map
-from padim.utils import select_device
+from padim.datasets import FolderDataset, MVTecDataset
+from padim.datasets.utils import CPUPrefetcher, CUDAPrefetcher
+from padim.models import AnomalyMap
+from padim.utils import plot_fig, plot_score_map, select_device
 
 logger = logging.getLogger(__name__)
 
@@ -39,59 +36,84 @@ class Evaler:
     def __init__(self, config: DictConfig) -> None:
         self.config = config
 
-    def create_model(self, device: torch.device) -> nn.Module:
-        model = PaDiMModel(self.config.MODEL.BACKBONE, OmegaConf.to_container(self.config.MODEL.RETURN_NODES))
+    @staticmethod
+    def create_model(checkpoint: Any, device: torch.device) -> nn.Module:
+        """Create a model from checkpoint."""
+        logger.info(f"load model from checkpoint")
+        model = checkpoint["model"]
+        model.eval()
         model = model.to(device)
         return model
 
-    def get_dataloader(self, task: int) -> torch.utils.data.DataLoader:
-        if task == 0:
+    @staticmethod
+    def get_stats(checkpoint: Any, device: torch.device) -> list:
+        """Get features from checkpoint."""
+        logger.info(f"load features from checkpoint")
+        stats = checkpoint["stats"]
+        stats = [stat.to(device) for stat in stats]
+        return stats
+
+    @staticmethod
+    def get_transform(checkpoint: Any) -> tuple[A.Compose, A.Compose]:
+        """Get image and mask transforms."""
+        return checkpoint["image_transforms"], checkpoint["mask_transforms"]
+
+    @staticmethod
+    def get_loader(
+            config: DictConfig,
+            image_transforms: A.Compose,
+            mask_transforms: A.Compose,
+            mask_size: tuple[int, int],
+            cls_task: bool,
+            device: torch.device = torch.device("cpu"),
+    ) -> CPUPrefetcher | CUDAPrefetcher:
+        if cls_task:
+            logger.info("Load classification dataset.")
             val_dataset = FolderDataset(
-                self.config.DATASETS.ROOT.TEST,
-                self.config.DATASETS.TRANSFORMS.RESIZE,
+                config.DATASETS.ROOT.TEST,
+                image_transforms,
+                mask_size,
             )
         else:
+            logger.info("Load segmentation dataset.")
             val_dataset = MVTecDataset(
-                self.config.DATASETS.ROOT,
-                self.config.DATASETS.CATEGORY,
-                self.config.DATASETS.TRANSFORMS.RESIZE,
-                is_train=False,
+                config.DATASETS.ROOT,
+                config.DATASETS.CATEGORY,
+                image_transforms,
+                mask_transforms,
+                mask_size,
+                train=False,
             )
-        val_dataloader = torch.utils.data.DataLoader(
+
+        val_loader = torch.utils.data.DataLoader(
             val_dataset,
-            batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
-            shuffle=True,
+            batch_size=config.VAL.HYP.get("IMGS_PER_BATCH"),
+            shuffle=False,
             num_workers=4,
             sampler=None,
             pin_memory=True,
             drop_last=False,
             persistent_workers=True,
         )
-        return val_dataloader
 
-    def get_features(self) -> Any:
-        weights_path = self.config.VAL.WEIGHTS_PATH
-        if not weights_path.endswith(".pkl"):
-            raise ValueError(f"Only support '.pkl' file, but got {weights_path}")
+        if device == "cuda":
+            val_loader = CUDAPrefetcher(val_loader, device)
+        else:
+            val_loader = CPUPrefetcher(val_loader)
 
-        with open(weights_path, "rb") as f:
-            features = pickle.load(f)
-
-        return features
+        return val_loader
 
     @staticmethod
     def run_validation(
             model: nn.Module,
-            category: str,
-            val_dataloader: torch.utils.data.DataLoader,
-            return_nodes: list,
-            index: Tensor,
-            train_features: list,
-            image_size: int,
-            task: int,
+            val_loader: CPUPrefetcher | CUDAPrefetcher,
+            stats: list[Tensor],
+            mask_size: tuple[int, int],
+            cls_task: bool,
             device: torch.device = torch.device("cpu"),
             save_visual_dir: str = "./results/eval/visual",
     ) -> None:
+        anomaly_map_func = AnomalyMap(mask_size)
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
         fig_image_roc_auc = ax[0]
         fig_pixel_roc_auc = ax[1]
@@ -102,41 +124,36 @@ class Evaler:
         gt_mask_list = []
         test_image_names = []
 
-        eval_features = OrderedDict((layer, []) for layer in return_nodes)
         # get intermediate layer outputs
-        for (images, targets, masks, image_names) in tqdm(val_dataloader, f"eval"):
-            test_images.extend(images.cpu().detach().numpy())
-            gt_list.extend(targets.cpu().detach().numpy())
-            gt_mask_list.extend(masks.cpu().detach().numpy())
-            test_image_names.append(image_names)
-            # model prediction
-            if device.type == "cuda" and torch.cuda.is_available():
-                images = images.to(device, non_blocking=True)
-            feature = model(images)
-            # get intermediate layer outputs
-            for k, v in feature.items():
-                eval_features[k].append(v)
+        embeddings: list[Tensor] = []
+        for i, batch_data in enumerate(val_loader):
+            image = batch_data["image"].to(device, non_blocking=True)
+            target = batch_data["target"]
+            mask = batch_data["mask"]
+            image_path = batch_data["image_path"]
+            test_images.extend(image.cpu().detach().numpy())
+            gt_list.extend(target.cpu().detach().numpy())
+            gt_mask_list.extend(mask.cpu().detach().numpy())
+            test_image_names.append(image_path)
 
-        # Embedding concat
-        index = index.to(device)
-        embedding = generate_embedding(eval_features, return_nodes, index)
+            embedding = model(image)
+            embeddings.append(embedding)
 
-        # calculate distance matrix
-        distances = calculate_distance_matrix(embedding, train_features)
-
-        # up-sample
-        anomaly_map = get_anomaly_map(distances, image_size)
+        anomaly_map = anomaly_map_func(embeddings, stats)
 
         # Normalization
         max_score = anomaly_map.max()
         min_score = anomaly_map.min()
         scores = (anomaly_map - min_score) / (max_score - min_score)
 
-        if task == 0:
+        vmax = scores.max() * 255.
+        vmin = scores.min() * 255.
+
+        if cls_task:
             num_images = len(scores)
             for i in range(num_images):
                 save_file_name = os.path.join(save_visual_dir, test_image_names[0][i].split(".")[0] + ".png")
-                plot_score_map(test_images[i], scores[i], save_file_name)
+                plot_score_map(test_images[i], scores[i], vmin, vmax, save_file_name)
         else:
             # calculate image-level ROC AUC score
             image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
@@ -145,7 +162,7 @@ class Evaler:
             image_roc_auc = roc_auc_score(gt_list, image_scores)
             total_roc_auc.append(image_roc_auc)
             print(f"image ROCAUC: {image_roc_auc:.3f}")
-            fig_image_roc_auc.plot(fpr, tpr, label=f"{category} image_ROCAUC: {image_roc_auc:.3f}")
+            fig_image_roc_auc.plot(fpr, tpr, label=f"image_ROCAUC: {image_roc_auc:.3f}")
 
             # get optimal threshold
             gt_mask = np.asarray(gt_mask_list)
@@ -161,8 +178,8 @@ class Evaler:
             total_pixel_roc_auc.append(per_pixel_roc_auc)
             print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
 
-            fig_pixel_roc_auc.plot(fpr, tpr, label=f"{category} ROCAUC: {per_pixel_roc_auc:.3f}")
-            plot_fig(test_images, scores, gt_mask_list, threshold, save_visual_dir, category)
+            fig_pixel_roc_auc.plot(fpr, tpr, label=f"pixel_ROCAUC: {per_pixel_roc_auc:.3f}")
+            plot_fig(test_images, scores, gt_mask_list, threshold, save_visual_dir)
 
             fig.tight_layout()
             fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
@@ -170,39 +187,35 @@ class Evaler:
     def validation(self) -> None:
         device = select_device(self.config["DEVICE"])
 
+        cls_task: bool = False
         if self.config.TASK == "classification":
-            task = 0
-        elif self.config.TASK == "segmentation":
-            task = 1
-        else:
-            raise ValueError(f"Task '{self.config.TASK}' is not supported.")
-
-        model = self.create_model(device)
-        val_dataloader = self.get_dataloader(task)
-        train_features = self.get_features()
-
-        max_features = MODEL_MAX_FEATURES[self.config.MODEL.BACKBONE]
-        num_features = MODEL_NUM_FEATURES[self.config.MODEL.BACKBONE]
-        index = torch.tensor(random.sample(range(0, max_features), num_features))
+            cls_task = True
 
         # Create a folder to save the visual results
         save_visual_dir = os.path.join("results", "eval", self.config.EXP_NAME, "visual")
         os.makedirs(save_visual_dir, exist_ok=True)
 
-        if task == 0:
-            category = ""
-        else:
-            category = self.config.DATASETS.CATEGORY
+        checkpoint = torch.load(self.config.VAL.WEIGHTS_PATH, map_location=device)
+        print(checkpoint)
+        model = self.create_model(checkpoint, device)
+        stats = self.get_stats(checkpoint, device)
+        image_transforms, mask_transforms = self.get_transform(checkpoint)
+        mask_size = checkpoint["mask_size"]
+        val_loader = self.get_loader(
+            self.config,
+            image_transforms,
+            mask_transforms,
+            mask_size,
+            cls_task,
+            device,
+        )
 
         self.run_validation(
             model,
-            category,
-            val_dataloader,
-            OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
-            index,
-            train_features,
-            self.config.DATASETS.TRANSFORMS.RESIZE,
-            task,
+            val_loader,
+            stats,
+            mask_size,
+            cls_task,
             device,
             save_visual_dir,
         )

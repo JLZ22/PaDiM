@@ -52,7 +52,7 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, vmin: float, vmax: flo
     plt.close()
 
 
-def plot_fig(test_image, scores, gts, threshold, save_dir, class_name):
+def plot_fig(test_image, scores, gts, threshold, save_dir):
     num = len(scores)
     vmax = scores.max() * 255.
     vmin = scores.min() * 255.
@@ -102,5 +102,5 @@ def plot_fig(test_image, scores, gts, threshold, save_dir, class_name):
         }
         cb.set_label("Anomaly Score", fontdict=font)
 
-        fig_image.savefig(os.path.join(save_dir, class_name + "_{}".format(i)), dpi=100)
+        fig_image.savefig(os.path.join(save_dir, "{}".format(i)), dpi=100)
         plt.close()

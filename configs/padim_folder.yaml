@@ -34,3 +34,5 @@ VAL:
 
   HYP:
     IMGS_PER_BATCH: 32
+
+  PRINT_FREQ: 1
