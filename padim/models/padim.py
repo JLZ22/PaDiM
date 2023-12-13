@@ -14,6 +14,7 @@
 import random
 
 import torch
+from omegaconf import ListConfig, OmegaConf
 from torch import nn, Tensor
 from torch.nn import functional as F_torch
 
@@ -55,10 +56,12 @@ class PaDiM(nn.Module):
             self,
             backbone: str,
             image_size: tuple[int, int],
-            return_nodes: list[str],
+            return_nodes: ListConfig | list[str],
             pretrained: bool = True,
     ) -> None:
         super().__init__()
+        if isinstance(return_nodes, ListConfig):
+            return_nodes = OmegaConf.to_container(return_nodes)
         self.return_nodes = return_nodes
         self.feature_extractor = FeatureExtractor(backbone, return_nodes, pretrained)
         self.anomaly_map = AnomalyMap(image_size)

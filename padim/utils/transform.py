@@ -17,14 +17,14 @@ Based on 'albumentations' formulation of data transformation method
 import logging
 
 import albumentations as A
+import cv2
 from albumentations.pytorch import ToTensorV2
 from omegaconf import DictConfig
-import cv2
 
 logger = logging.getLogger(__name__)
 
 
-def get_data_transform(transform_dict: DictConfig) -> A.Compose:
+def get_data_transform(transform_dict: DictConfig) -> list:
     r"""Get data transform.
 
     Args:
@@ -33,12 +33,12 @@ def get_data_transform(transform_dict: DictConfig) -> A.Compose:
     Returns:
         A.Compose: data transform.
     """
-    logger.info(f"transform_dict: {transform_dict}")
     transform: A.Compose
     transform_list = []
 
     resize_transform = transform_dict.get("RESIZE", {})
     center_crop_transform = transform_dict.get("CENTER_CROP", {})
+    normalize_transform = transform_dict.get("NORMALIZE", {})
 
     if resize_transform:
         transform_list.append(A.Resize(resize_transform.get("HEIGHT"), resize_transform.get("WIDTH"),
@@ -48,6 +48,10 @@ def get_data_transform(transform_dict: DictConfig) -> A.Compose:
     if center_crop_transform:
         transform_list.append(A.CenterCrop(center_crop_transform.get("HEIGHT"), center_crop_transform.get("WIDTH"), always_apply=True))
 
-    transform_list.append(ToTensorV2())
+    if normalize_transform:
+        transform_list.append(A.Normalize(normalize_transform.get("MEAN"), normalize_transform.get("STD"), always_apply=True))
 
-    return A.Compose(transform_list)
+    transform_list.append(ToTensorV2())
+    logger.info(f"transform_list: {transform_list}")
+
+    return transform_list

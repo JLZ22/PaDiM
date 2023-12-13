@@ -51,7 +51,8 @@ class MVTecDataset(torch.utils.data.Dataset):
         >>> image_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
         >>> mask_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
         >>> mask_size = (config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH)
-        >>> dataset = MVTecDataset("./data/mvtec_anomaly_detection", "bottle", image_transforms, mask_transforms, mask_size, train=False,
+        >>> dataset = MVTecDataset("./data/mvtec_anomaly_detection", "bottle", A.Compose(image_transforms), A.Compose(mask_transforms), mask_size,
+        train=False,
         download=True)
         >>> sample = dataset[0]
         >>> image, target, mask, image_path = sample["image"], sample["target"], sample["mask"], sample["image_path"]
@@ -61,7 +62,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         126
     """
 
-    meta = DownloadInfo(
+    download_info = DownloadInfo(
         name="mvtec",
         url="https://www.mydrive.ch/shares/38536/3830184030e49fe74747669442f0f282/download/420938113-1629952094/mvtec_anomaly_detection.tar.xz",
         hash="eefca59f2cede9c3fc5b6befbfec275e",
@@ -125,7 +126,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         if self.root.is_dir():
             logger.info("Files already downloaded and verified")
             return
-        download_and_extract_archive(self.root, self.meta)
+        download_and_extract_archive(self.root, self.download_info)
 
     def load(self):
         phase = "train" if self.train else "test"

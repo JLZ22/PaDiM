@@ -13,10 +13,14 @@
 # ==============================================================================
 import logging
 
+from .average_meter import AverageMeter
+from .progress_meter import ProgressMeter
+from .summary import Summary
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "configure_logger",
+    "configure_logger", "Summary", "AverageMeter", "ProgressMeter",
 ]
 
 

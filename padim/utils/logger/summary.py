@@ -11,10 +11,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-from .common import *
-from .download import *
-from .ops import *
-from .plots import *
-from .prefetcher import *
-from .seed import *
-from .transform import *
+from enum import Enum
+
+
+class Summary(Enum):
+    NONE = 0
+    AVERAGE = 1
+    SUM = 2
+    COUNT = 3
