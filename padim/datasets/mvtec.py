@@ -11,14 +11,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""
+MVTec Dataset `https://www.mvtec.com/company/research/datasets/mvtec-ad/`
+"""
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import albumentations as A
 import cv2
 import torch
 import torch.utils.data
+from torch import Tensor
 
 from padim.utils.download import DownloadInfo, download_and_extract_archive
 
@@ -41,15 +46,17 @@ class MVTecDataset(torch.utils.data.Dataset):
         >>> from padim.datasets import MVTecDataset
         >>> from omegaconf import OmegaConf
         >>> from padim.utils import get_data_transform
-        >>> config = OmegaConf.load(".configs/padim.yaml")
+        >>> config = OmegaConf.load("./configs/padim.yaml")
         >>> config = OmegaConf.create(config)
         >>> image_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
         >>> mask_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
         >>> mask_size = (config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH)
-        >>> dataset = MVTecDataset(".data/mvtec_anomaly_detection", "bottle", image_transforms, mask_transforms, mask_size, train=False, download=True)
-        >>> image, target, mask = dataset[0]
-        >>> print(image.shape, target, mask.shape)
-        torch.Size([3, 224, 224]) 0 torch.Size([1, 224, 224])
+        >>> dataset = MVTecDataset("./data/mvtec_anomaly_detection", "bottle", image_transforms, mask_transforms, mask_size, train=False,
+        download=True)
+        >>> sample = dataset[0]
+        >>> image, target, mask, image_path = sample["image"], sample["target"], sample["mask"], sample["image_path"]
+        >>> print(image.shape, target, mask.shape, image_path)
+        torch.Size([3, 224, 224]) 0 torch.Size([1, 224, 224]) ./data/mvtec_anomaly_detection/bottle/test/broken/good_000.png
         >>> len(dataset)
         126
     """
@@ -75,7 +82,6 @@ class MVTecDataset(torch.utils.data.Dataset):
             mask_size: tuple[int, int] = (224, 224),
             train: bool = True,
             download: bool = False,
-
     ) -> None:
         super().__init__()
         self.root = Path(root)
@@ -89,12 +95,12 @@ class MVTecDataset(torch.utils.data.Dataset):
             self.download()
 
         # load dataset
-        self.images, self.targets, self.masks = self.load()
+        self.image_list, self.target_list, self.mask_list = self.load()
 
-    def __getitem__(self, index: int):
-        image_path = self.images[index]
-        target = self.targets[index]
-        mask_path = self.masks[index]
+    def __getitem__(self, index: int) -> dict[str, str | int | Tensor | Any]:
+        image_path = self.image_list[index]
+        target = self.target_list[index]
+        mask_path = self.mask_list[index]
 
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -107,14 +113,17 @@ class MVTecDataset(torch.utils.data.Dataset):
             mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
             mask = self.image_transforms(image=mask)["image"]
 
-        return image, target, mask
+        return {"image": image,
+                "target": target,
+                "mask": mask,
+                "image_path": image_path}
 
     def __len__(self):
-        return len(self.images)
+        return len(self.image_list)
 
     def download(self) -> None:
         if self.root.is_dir():
-            print("Files already downloaded and verified")
+            logger.info("Files already downloaded and verified")
             return
         download_and_extract_archive(self.root, self.meta)
 
