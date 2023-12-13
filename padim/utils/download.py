@@ -26,13 +26,13 @@ from zipfile import ZipFile
 from tqdm import tqdm
 
 __all__ = [
-    "DownloadInfo", "DownloadProgressBar", "download_and_extract",
+    "DownloadInfo", "DownloadProgressBar", "download_and_extract_archive",
 ]
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "DownloadInfo", "DownloadProgressBar", "download_and_extract",
+    "DownloadInfo", "DownloadProgressBar", "download_and_extract_archive",
 ]
 
 UNSAFE_PATTERNS = ["/etc/", "/root/"]
@@ -175,7 +175,7 @@ def _extract(file_name: Path, root: Path) -> None:
     file_name.unlink()
 
 
-def download_and_extract(root: Path, info: DownloadInfo) -> None:
+def download_and_extract_archive(root: Path, info: DownloadInfo) -> None:
     r"""Download and extract a dataset.
 
     Args:

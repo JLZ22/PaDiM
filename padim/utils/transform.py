@@ -19,6 +19,7 @@ import logging
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from omegaconf import DictConfig
+import cv2
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,9 @@ def get_data_transform(transform_dict: DictConfig) -> A.Compose:
     center_crop_transform = transform_dict.get("CENTER_CROP", {})
 
     if resize_transform:
-        transform_list.append(A.Resize(resize_transform.get("HEIGHT"), resize_transform.get("WIDTH"), always_apply=True))
+        transform_list.append(A.Resize(resize_transform.get("HEIGHT"), resize_transform.get("WIDTH"),
+                                       interpolation=cv2.INTER_NEAREST,
+                                       always_apply=True))
 
     if center_crop_transform:
         transform_list.append(A.CenterCrop(center_crop_transform.get("HEIGHT"), center_crop_transform.get("WIDTH"), always_apply=True))
