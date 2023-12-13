@@ -14,5 +14,6 @@
 from .common import *
 from .download import *
 from .ops import *
-from .plot import *
+from .plots import *
 from .seed import *
+from .transform import *
