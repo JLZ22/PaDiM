@@ -28,7 +28,7 @@ class PaDiM(nn.Module):
         backbone (str): The backbone of the feature extractor.
         return_nodes (list[str]): The nodes to return from the feature extractor.
         pretrained (bool): Whether to use pretrained weights for the feature extractor.
-        image_size (tuple[int, int], optional): The input image size. Default: (224, 224)
+        mask_size (tuple[int, int], optional): The input image size. Default: (224, 224)
 
     Raises:
         ValueError: If the backbone is not supported.
@@ -36,7 +36,7 @@ class PaDiM(nn.Module):
     Examples:
         >>> import torch
         >>> from padim.models import PaDiM
-        >>> model = PaDiM("wide_resnet50_2", (224, 224), ["layer1.2.relu_2", "layer2.3.relu_2", "layer3.3.relu_2"])
+        >>> model = PaDiM("wide_resnet50_2", ["layer1.2.relu_2", "layer2.3.relu_2", "layer3.3.relu_2"], mask_size=(224, 224), )
         >>> x = torch.rand((32, 3, 224, 224))
         >>> out = model(x)
         >>> out.shape
@@ -57,14 +57,14 @@ class PaDiM(nn.Module):
             backbone: str,
             return_nodes: ListConfig | list[str],
             pretrained: bool = True,
-            image_size: tuple[int, int] = (224, 224)
+            mask_size: tuple[int, int] = (224, 224)
     ) -> None:
         super().__init__()
         if isinstance(return_nodes, ListConfig):
             return_nodes = OmegaConf.to_container(return_nodes)
         self.return_nodes = return_nodes
         self.feature_extractor = FeatureExtractor(backbone, return_nodes, pretrained)
-        self.anomaly_map = AnomalyMap(image_size)
+        self.anomaly_map = AnomalyMap(mask_size)
 
         self.index: Tensor
         max_features = self.max_features_dict[backbone]

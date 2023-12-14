@@ -71,7 +71,7 @@ class Trainer(Base, ABC):
     def create_model(self) -> nn.Module:
         """Create a model."""
         logger.info(f"Create model: {self.config.MODEL.BACKBONE}")
-        model = PaDiM(self.config.MODEL.BACKBONE, self.config.MODEL.RETURN_NODES, image_size=self.mask_size)
+        model = PaDiM(self.config.MODEL.BACKBONE, self.config.MODEL.RETURN_NODES, mask_size=self.mask_size)
         model = model.to(self.device)
         return model
 
@@ -151,7 +151,7 @@ class Trainer(Base, ABC):
         """Get features from the backbone network."""
         batch_time = AverageMeter("Time", ":6.3f")
         data_time = AverageMeter("Data", ":6.3f")
-        progress = ProgressMeter(len(self.train_loader), [batch_time, data_time], prefix="Get features ")
+        progress = ProgressMeter(len(self.train_loader), [batch_time, data_time], prefix=logger.info("Get features "))
 
         end = time.time()
         for i, batch_data in enumerate(self.train_loader):
@@ -178,6 +178,7 @@ class Trainer(Base, ABC):
 
     def save_checkpoint(self) -> None:
         """Save the model checkpoint."""
+        logger.info(f"Save the model to '{self.save_weights_path}'. please wait...")
         torch.save({
             "model": deepcopy(self.model).half(),
             "stats": self.stats,
@@ -186,7 +187,7 @@ class Trainer(Base, ABC):
             "mask_size": self.mask_size,
             "config": self.config,
         }, self.save_weights_path)
-        logger.info(f"Save the model to '{self.save_weights_path}'.")
+        logger.info("Save the model successfully.")
 
     def train(self) -> None:
         self.get_embeddings()
