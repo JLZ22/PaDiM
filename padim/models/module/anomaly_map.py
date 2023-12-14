@@ -49,10 +49,9 @@ class AnomalyMap(nn.Module):
         # calculate mahalanobis distances
         mean, inv_covariance = stats
         delta = (embedding - mean).permute(2, 0, 1)
-
-        # Use einsum to calculate distances
-        distances = torch.einsum("bik,ijk,bik->bj", delta, inv_covariance, delta)
-        distances = distances.view_as(embedding).clamp(min=0).sqrt()
+        distances = (torch.matmul(delta, inv_covariance) * delta).sum(2).permute(1, 0)
+        distances = distances.reshape(batch, 1, height, width)
+        distances = distances.clamp(0).sqrt()
 
         return distances
 
