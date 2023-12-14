@@ -48,12 +48,10 @@ class MVTecDataset(torch.utils.data.Dataset):
         >>> from padim.utils import get_data_transform
         >>> config = OmegaConf.load("./configs/mvtec.yaml")
         >>> config = OmegaConf.create(config)
-        >>> image_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
-        >>> mask_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
+        >>> image_transforms = A.Compose(get_data_transform(config.DATASETS.TRANSFORMS))
+        >>> mask_transforms = A.Compose(get_data_transform(config.DATASETS.TRANSFORMS))
         >>> mask_size = (config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH)
-        >>> dataset = MVTecDataset("./data/mvtec_anomaly_detection", "bottle", A.Compose(image_transforms), A.Compose(mask_transforms), mask_size,
-        train=False,
-        download=True)
+        >>> dataset = MVTecDataset("./data/mvtec_anomaly_detection", "bottle", image_transforms, mask_transforms, mask_size, train=False)
         >>> sample = dataset[0]
         >>> image, target, mask, image_path = sample["image"], sample["target"], sample["mask"], sample["image_path"]
         >>> print(image.shape, target, mask.shape, image_path)
