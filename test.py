@@ -11,3 +11,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+import torch
+
+from padim.models import PaDiM
+
+if __name__ == '__main__':
+    model = PaDiM("wide_resnet50_2", (224, 224), ["layer1.2.relu_2", "layer2.3.relu_2", "layer3.3.relu_2"])
+    x = torch.rand((32, 3, 224, 224))
+    out = model(x)
+    print(out.shape)
