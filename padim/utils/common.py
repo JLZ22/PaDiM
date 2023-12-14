@@ -58,7 +58,7 @@ def select_device(device: str = "cpu") -> torch.device:
         logger.info("Use CPU.")
         device = torch.device("cpu")
         if torch.cuda.is_available():
-            logger.warning("You have a CUDA device, enabling CUDA will give you a large boost in performance.")
+            logger.info("You have a CUDA device, enabling CUDA will give you a large boost in performance.")
     elif device in ["cuda", "gpu"]:
         if not torch.cuda.is_available():
             logger.warning("CUDA is not available, switching to CPU.")

@@ -180,7 +180,7 @@ class Trainer(Base, ABC):
         """Save the model checkpoint."""
         logger.info(f"Save the model to '{self.save_weights_path}'. please wait...")
         torch.save({
-            "model": deepcopy(self.model).half(),
+            "model": deepcopy(self.model),
             "stats": self.stats,
             "image_transforms": self.image_transforms,
             "mask_transforms": self.mask_transforms,
