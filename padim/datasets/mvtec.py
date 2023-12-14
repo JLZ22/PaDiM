@@ -112,7 +112,7 @@ class MVTecDataset(torch.utils.data.Dataset):
             mask = torch.zeros([1, self.mask_size[0], self.mask_size[1]])
         else:
             mask = cv2.imread(mask_path)
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
+            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
             mask = mask.astype("float32") / 255.0
             mask = self.mask_transforms(image=mask)["image"]
 

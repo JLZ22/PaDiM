@@ -13,21 +13,19 @@
 # ==============================================================================
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import albumentations as A
-import numpy as np
 import torch
 import torch.utils.data
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig
-from sklearn.metrics import roc_curve, roc_auc_score, precision_recall_curve
-from torch import nn, Tensor
+from torch import nn
 
 from padim.datasets import FolderDataset, MVTecDataset
 from padim.datasets.utils import CPUPrefetcher, CUDAPrefetcher
-from padim.models import AnomalyMap
-from padim.utils import plot_fig, plot_score_map, select_device
+from padim.utils import plot_score_map, select_device
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +85,7 @@ class Evaler:
 
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
-            batch_size=config.VAL.HYP.get("IMGS_PER_BATCH"),
+            batch_size=len(val_dataset),
             shuffle=False,
             num_workers=4,
             sampler=None,
@@ -107,82 +105,71 @@ class Evaler:
     def run_validation(
             model: nn.Module,
             val_loader: CPUPrefetcher | CUDAPrefetcher,
-            stats: list[Tensor],
-            mask_size: tuple[int, int],
             cls_task: bool,
             device: torch.device = torch.device("cpu"),
-            save_visual_dir: str = "./results/eval/visual",
+            save_visual_dir: str | Path = "results/eval/visual",
     ) -> None:
-        anomaly_map_func = AnomalyMap(mask_size)
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
-        fig_image_roc_auc = ax[0]
-        fig_pixel_roc_auc = ax[1]
-        total_roc_auc = []
-        total_pixel_roc_auc = []
-        test_images = []
-        gt_list = []
-        gt_mask_list = []
-        test_image_names = []
+        # fig_image_roc_auc = ax[0]
+        # fig_pixel_roc_auc = ax[1]
+        image_data_list = []
+        target_data_list = []
+        mask_data_list = []
+        image_path_list = []
 
-        # get intermediate layer outputs
-        embeddings: list[Tensor] = []
-        for i, batch_data in enumerate(val_loader):
-            image = batch_data["image"].to(device, non_blocking=True)
-            target = batch_data["target"]
-            mask = batch_data["mask"]
-            image_path = batch_data["image_path"]
-            test_images.extend(image.cpu().detach().numpy())
-            gt_list.extend(target.cpu().detach().numpy())
-            gt_mask_list.extend(mask.cpu().detach().numpy())
-            test_image_names.append(image_path)
+        # Load data
+        batch_data = next(iter(val_loader))
+        image = batch_data["image"].to(device, non_blocking=True)
+        target = batch_data["target"].to(device, non_blocking=True)
+        mask = batch_data["mask"].to(device, non_blocking=True)
+        image_path = batch_data["image_path"]
 
-            embedding = model(image)
-            embeddings.append(embedding)
+        # get all images anomaly map
+        anomaly_map = model(image)
 
-        anomaly_map = anomaly_map_func(embeddings, stats)
+        image_data_list.extend(image.cpu().detach().numpy())
+        target_data_list.extend(target.cpu().detach().numpy())
+        mask_data_list.extend(mask.cpu().detach().numpy())
+        image_path_list.extend(image_path)
 
         # Normalization
+        anomaly_map = anomaly_map.detach().cpu().numpy()
         max_score = anomaly_map.max()
         min_score = anomaly_map.min()
         scores = (anomaly_map - min_score) / (max_score - min_score)
 
-        vmax = scores.max() * 255.
-        vmin = scores.min() * 255.
-
         if cls_task:
             num_images = len(scores)
             for i in range(num_images):
-                save_file_name = os.path.join(save_visual_dir, test_image_names[0][i].split(".")[0] + ".png")
-                plot_score_map(test_images[i], scores[i], vmin, vmax, save_file_name)
-        else:
-            # calculate image-level ROC AUC score
-            image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
-            gt_list = np.asarray(gt_list)
-            fpr, tpr, _ = roc_curve(gt_list, image_scores)
-            image_roc_auc = roc_auc_score(gt_list, image_scores)
-            total_roc_auc.append(image_roc_auc)
-            print(f"image ROCAUC: {image_roc_auc:.3f}")
-            fig_image_roc_auc.plot(fpr, tpr, label=f"image_ROCAUC: {image_roc_auc:.3f}")
-
-            # get optimal threshold
-            gt_mask = np.asarray(gt_mask_list)
-            precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
-            a = 2 * precision * recall
-            b = precision + recall
-            f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
-            threshold = thresholds[np.argmax(f1)]
-
-            # calculate per-pixel level ROCAUC
-            fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
-            per_pixel_roc_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
-            total_pixel_roc_auc.append(per_pixel_roc_auc)
-            print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
-
-            fig_pixel_roc_auc.plot(fpr, tpr, label=f"pixel_ROCAUC: {per_pixel_roc_auc:.3f}")
-            plot_fig(test_images, scores, gt_mask_list, threshold, save_visual_dir)
-
-            fig.tight_layout()
-            fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
+                save_plot_path = Path(save_visual_dir) / f"{os.path.basename(image_path_list[i])}"
+                plot_score_map(image_data_list[i], scores[i], 0, 255, save_plot_path)
+        # else:
+        #     # calculate image-level ROC AUC score
+        #     image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
+        #     gt_list = np.asarray(target_data_list)
+        #     fpr, tpr, _ = roc_curve(gt_list, image_scores)
+        #     image_roc_auc = roc_auc_score(gt_list, image_scores)
+        #     print(f"image ROCAUC: {image_roc_auc:.3f}")
+        #     fig_image_roc_auc.plot(fpr, tpr, label=f"image_ROCAUC: {image_roc_auc:.3f}")
+        #
+        #     # get optimal threshold
+        #     gt_mask = np.asarray(mask_data_list)
+        #     precision, recall, thresholds = precision_recall_curve(gt_mask.flatten(), scores.flatten())
+        #     a = 2 * precision * recall
+        #     b = precision + recall
+        #     f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
+        #     threshold = thresholds[np.argmax(f1)]
+        #
+        #     # calculate per-pixel level ROCAUC
+        #     fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
+        #     per_pixel_roc_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
+        #     print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
+        #
+        #     fig_pixel_roc_auc.plot(fpr, tpr, label=f"pixel_ROCAUC: {per_pixel_roc_auc:.3f}")
+        #     plot_fig(image_data_list, scores, mask_data_list, threshold, save_visual_dir)
+        #
+        #     fig.tight_layout()
+        #     fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
 
     def validation(self) -> None:
         device = select_device(self.config["DEVICE"])
@@ -197,7 +184,6 @@ class Evaler:
 
         checkpoint = torch.load(self.config.VAL.WEIGHTS_PATH, map_location=device)
         model = self.create_model(checkpoint, device)
-        stats = self.get_stats(checkpoint, device)
         image_transforms, mask_transforms = self.get_transform(checkpoint)
         mask_size = checkpoint["mask_size"]
         val_loader = self.get_loader(
@@ -212,8 +198,6 @@ class Evaler:
         self.run_validation(
             model,
             val_loader,
-            stats,
-            mask_size,
             cls_task,
             device,
             save_visual_dir,

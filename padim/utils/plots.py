@@ -31,6 +31,7 @@ def plot_score_map(image: np.ndarray, scores: np.ndarray, vmin: float, vmax: flo
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     image = de_normalization(image)
     heat_map = scores * 255
+    heat_map = heat_map.transpose(1, 2, 0).astype(np.uint8)
     fig_image, ax_image = plt.subplots(1, 2, figsize=(4, 3))
     fig_image.subplots_adjust(right=0.9)
     for ax_i in ax_image:

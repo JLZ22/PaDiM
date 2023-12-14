@@ -5,8 +5,8 @@ DEVICE: "cpu"
 TASK: "classification"
 
 MODEL:
-  BACKBONE: "wide_resnet50_2"
-  RETURN_NODES: ["layer1.2.relu_2", "layer2.3.relu_2", "layer3.3.relu_2"]
+  BACKBONE: "resnet18"
+  RETURN_NODES: ["layer1.1.relu_1", "layer2.1.relu_1", "layer3.1.relu_1"]
 
 DATASETS:
   ROOT:
@@ -31,8 +31,3 @@ TRAIN:
 
 VAL:
   WEIGHTS_PATH: "./results/train/padim-folder/model.pkl"
-
-  HYP:
-    IMGS_PER_BATCH: 32
-
-  PRINT_FREQ: 1

@@ -38,29 +38,29 @@ class Trainer(Base, ABC):
         self.config = config
         self.device = select_device(config["DEVICE"])
 
+        self.stats: list[Tensor] = []
+        self.embeddings: list[Tensor] = []
+
         self.cls_task: bool = False
         if self.config.TASK == "classification":
             self.cls_task = True
 
         transforms_dict = self.config.DATASETS.TRANSFORMS
         self.image_transforms, self.mask_transforms = self.get_transform(transforms_dict)
-        mask_size = (transforms_dict.CENTER_CROP.get("HEIGHT"), transforms_dict.CENTER_CROP.get("WIDTH"))
-        self.mask_size = mask_size
+        self.mask_size = (transforms_dict.CENTER_CROP.get("HEIGHT"), transforms_dict.CENTER_CROP.get("WIDTH"))
         self.model = self.create_model()
         self.train_loader, self.val_loader = self.get_loader()
-
-        self.stats: list[Tensor] = []
-        self.embeddings: list[Tensor] = []
-
-        # self.evaler = Evaler(config)
 
         # Create a folder to save the model
         save_weights_dir = Path("results", "train", config.EXP_NAME)
         save_weights_dir.mkdir(exist_ok=True, parents=True)
         self.save_weights_path = Path(save_weights_dir, "model.pkl")
-        # Create a folder to save the visual results
-        self.save_visual_dir = Path("results", "train", config.EXP_NAME, "visual")
-        self.save_visual_dir.mkdir(exist_ok=True, parents=True)
+
+        # Evaluate the model
+        # self.evaler = Evaler(config)
+        # # Create a folder to save the visual results
+        # self.save_visual_dir = Path("results", "train", config.EXP_NAME, "visual")
+        # self.save_visual_dir.mkdir(exist_ok=True, parents=True)
 
     def create_model(self) -> nn.Module:
         """Create a model."""
@@ -73,9 +73,9 @@ class Trainer(Base, ABC):
         """Get the loader for training and validation."""
         image_transforms_list = get_data_transform(transforms_list)
         mask_transforms_list = image_transforms_list.copy()
+        mask_transforms_list.pop(-2)  # Remove the normalization transform
         image_transforms = A.Compose(image_transforms_list)
         mask_transforms = A.Compose(mask_transforms_list)
-        mask_transforms_list.pop(-2)  # Remove the normalization transform
 
         return image_transforms, mask_transforms
 
@@ -123,7 +123,7 @@ class Trainer(Base, ABC):
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
-            batch_size=self.config.VAL.HYP.get("IMGS_PER_BATCH"),
+            batch_size=len(val_dataset),
             shuffle=False,
             num_workers=4,
             sampler=None,
@@ -152,7 +152,6 @@ class Trainer(Base, ABC):
             # measure data loading time
             data_time.update(time.time() - end)
             image = batch_data["image"].to(self.device, non_blocking=True)
-
             embedding = self.model(image)
             self.embeddings.append(embedding)
 
@@ -188,20 +187,10 @@ class Trainer(Base, ABC):
         self.compute_patch_distribution()
         self.save_checkpoint()
 
-        # if self.task == 0:
-        #     category = ""
-        # else:
-        #     category = self.config.DATASETS.CATEGORY
-        #
         # self.evaler.run_validation(
         #     self.model,
-        #     category,
         #     self.val_loader,
-        #     OmegaConf.to_container(self.config.MODEL.RETURN_NODES),
-        #     self.index,
-        #     train_features,
-        #     transforms_list.RESIZE,
-        #     self.task,
+        #     self.cls_task,
         #     self.device,
         #     self.save_visual_dir,
         # )
