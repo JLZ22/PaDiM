@@ -14,8 +14,8 @@ DATASETS:
     TEST: "./data/folder/test"
   TRANSFORMS:
     RESIZE:
-      HEIGHT: 224
-      WIDTH: 224
+      HEIGHT: 256
+      WIDTH: 256
     CENTER_CROP:
       HEIGHT: 224
       WIDTH: 224

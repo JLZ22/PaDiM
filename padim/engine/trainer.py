@@ -44,13 +44,7 @@ class Trainer(Base, ABC):
 
         transforms_dict = self.config.DATASETS.TRANSFORMS
         self.image_transforms, self.mask_transforms = self.get_transform(transforms_dict)
-        if transforms_dict.get("RESIZE") is not None:
-            mask_size = (transforms_dict.RESIZE.get("HEIGHT"), transforms_dict.RESIZE.get("WIDTH"))
-        elif transforms_dict.get("CENTER_CROP") is not None:
-            mask_size = (transforms_dict.CENTER_CROP.get("HEIGHT"), transforms_dict.CENTER_CROP.get("WIDTH"))
-        else:
-            logger.error("Please specify the size of the mask.")
-            return
+        mask_size = (transforms_dict.CENTER_CROP.get("HEIGHT"), transforms_dict.CENTER_CROP.get("WIDTH"))
         self.mask_size = mask_size
         self.model = self.create_model()
         self.train_loader, self.val_loader = self.get_loader()
