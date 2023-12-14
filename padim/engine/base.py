@@ -37,9 +37,9 @@ class Base(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_transform(self, **kwargs) -> Any:
+    def create_transform(self, **kwargs) -> Any:
         raise NotImplementedError
 
     @abstractmethod
-    def get_loader(self, **kwargs) -> Any:
+    def get_dataloader(self, **kwargs) -> Any:
         raise NotImplementedError

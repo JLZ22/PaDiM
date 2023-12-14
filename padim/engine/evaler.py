@@ -49,13 +49,14 @@ class Evaler(Base, ABC):
         return model
 
     @staticmethod
-    def get_transform(checkpoint: Any) -> tuple[A.Compose, A.Compose]:
+    def create_transform(checkpoint: Any) -> tuple[A.Compose, A.Compose]:
         """Get image and mask transforms."""
         return checkpoint["image_transforms"], checkpoint["mask_transforms"]
 
     @staticmethod
-    def get_loader(
-            config: DictConfig,
+    def get_dataloader(
+            root: str | Path,
+            category: str,
             image_transforms: A.Compose,
             mask_transforms: A.Compose,
             mask_size: tuple[int, int],
@@ -64,39 +65,24 @@ class Evaler(Base, ABC):
     ) -> CPUPrefetcher | CUDAPrefetcher:
         if cls_task:
             logger.info("Load classification dataset.")
-            val_dataset = FolderDataset(
-                config.DATASETS.ROOT.get("VAL"),
-                image_transforms,
-                mask_size,
-            )
+            datasets = FolderDataset(root, image_transforms, mask_size)
         else:
             logger.info("Load segmentation dataset.")
-            val_dataset = MVTecDataset(
-                config.DATASETS.ROOT,
-                config.DATASETS.CATEGORY,
-                image_transforms,
-                mask_transforms,
-                mask_size,
-                train=False,
-            )
+            datasets = MVTecDataset(root, category, image_transforms, mask_transforms, mask_size, train=False)
 
-        val_loader = torch.utils.data.DataLoader(
-            val_dataset,
-            batch_size=len(val_dataset),
-            shuffle=False,
+        dataloader = torch.utils.data.DataLoader(
+            datasets,
+            batch_size=len(datasets),
             num_workers=4,
-            sampler=None,
             pin_memory=True,
-            drop_last=False,
             persistent_workers=True,
         )
 
         if device == "cuda":
-            val_loader = CUDAPrefetcher(val_loader, device)
+            dataloader = CUDAPrefetcher(dataloader, device)
         else:
-            val_loader = CPUPrefetcher(val_loader)
-
-        return val_loader
+            dataloader = CPUPrefetcher(dataloader)
+        return dataloader
 
     @staticmethod
     def run_validation(
@@ -104,9 +90,10 @@ class Evaler(Base, ABC):
             val_loader: CPUPrefetcher | CUDAPrefetcher,
             cls_task: bool,
             device: torch.device = torch.device("cpu"),
-            save_visual_dir: str | Path = "results/eval/visual",
+            save_visuals_dir: str | Path = "results/eval/visual",
     ) -> None:
         model.eval()
+
         fig, ax = plt.subplots(1, 2, figsize=(20, 10))
         fig_image_roc_auc = ax[0]
         fig_pixel_roc_auc = ax[1]
@@ -139,8 +126,8 @@ class Evaler(Base, ABC):
         if cls_task:
             num_images = len(scores)
             for i in range(num_images):
-                save_plot_path = Path(save_visual_dir) / f"{os.path.basename(image_path_list[i])}"
-                plot_score_map(image_data_list[i], scores[i], 0, 255, save_plot_path)
+                save_visuals_path = Path(save_visuals_dir) / os.path.basename(image_path_list[i])
+                plot_score_map(image_data_list[i], scores[i], 0, 255, save_visuals_path)
         else:
             # calculate image-level ROC AUC score
             image_scores = scores.reshape(scores.shape[0], -1).max(axis=1)
@@ -164,10 +151,11 @@ class Evaler(Base, ABC):
             print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
 
             fig_pixel_roc_auc.plot(fpr, tpr, label=f"pixel_ROCAUC: {per_pixel_roc_auc:.3f}")
-            plot_fig(image_data_list, scores, mask_data_list, threshold, save_visual_dir)
+            plot_fig(image_data_list, scores, mask_data_list, threshold, save_visuals_dir)
 
             fig.tight_layout()
-            fig.savefig(os.path.join(save_visual_dir, "roc_curve.png"), dpi=100)
+            save_fig_path = Path(save_visuals_dir / "roc_curve.png")
+            fig.savefig(save_fig_path, dpi=100)
 
     def validation(self) -> None:
         device = select_device(self.config["DEVICE"])
@@ -182,9 +170,16 @@ class Evaler(Base, ABC):
 
         checkpoint = torch.load(self.config.VAL.WEIGHTS_PATH, map_location=device)
         model = self.create_model(checkpoint, device)
-        image_transforms, mask_transforms = self.get_transform(checkpoint)
+        image_transforms, mask_transforms = self.create_transform(checkpoint)
         mask_size = checkpoint["mask_size"]
-        val_loader = self.get_loader(self.config, image_transforms, mask_transforms, mask_size, cls_task, device)
+        val_loader = self.get_dataloader(
+            self.config.DATASETS.ROOT.get("VAL'") if cls_task else self.config.DATASETS.ROOT,
+            self.config.DATASETS.CATEGORY,
+            image_transforms,
+            mask_transforms,
+            mask_size,
+            cls_task,
+            device)
 
         self.run_validation(
             model,

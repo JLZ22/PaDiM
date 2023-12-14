@@ -16,6 +16,7 @@ import time
 from abc import ABC
 from copy import deepcopy
 from pathlib import Path
+from typing import Dict
 
 import albumentations as A
 import torch
@@ -30,6 +31,7 @@ from padim.utils import select_device, get_data_transform
 from padim.utils.logger import AverageMeter, ProgressMeter
 from .base import Base
 from .evaler import Evaler
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,26 +43,22 @@ class Trainer(Base, ABC):
         self.stats: list[Tensor] = []
         self.embeddings: list[Tensor] = []
 
-        self.cls_task: bool = False
-        if self.config.TASK == "classification":
-            self.cls_task = True
+        self.cls_task = self.config.TASK == "classification"
 
         transforms_dict = self.config.DATASETS.TRANSFORMS
-        self.image_transforms, self.mask_transforms = self.get_transform(transforms_dict)
+        self.image_transforms, self.mask_transforms = self.create_transform(transforms_dict)
         self.mask_size = (transforms_dict.CENTER_CROP.get("HEIGHT"), transforms_dict.CENTER_CROP.get("WIDTH"))
         self.model = self.create_model()
-        self.train_loader, self.val_loader = self.get_loader()
+        self.train_loader, self.val_loader = self.get_dataloader()
 
-        # Create a folder to save the model
-        save_weights_dir = Path("results", "train", config.EXP_NAME)
-        save_weights_dir.mkdir(exist_ok=True, parents=True)
-        self.save_weights_path = Path(save_weights_dir, "model.pkl")
-
-        # Evaluate the model
+        # Evaluate configure
         self.evaler = Evaler(config)
-        # Create a folder to save the visual results
-        self.save_visual_dir = Path("results", "train", config.EXP_NAME, "visual")
-        self.save_visual_dir.mkdir(exist_ok=True, parents=True)
+
+        self.save_weights_dir: Path = Path("results") / "train" / config.EXP_NAME
+        self.save_weights_path: Path = Path(self.save_weights_dir) / "model.pkl"
+        self.save_visuals_dir: Path = Path(self.save_weights_dir) / "visuals"
+        self.save_weights_dir.mkdir(exist_ok=True, parents=True)
+        self.save_visuals_dir.mkdir(exist_ok=True, parents=True)
 
     def create_model(self) -> nn.Module:
         """Create a model."""
@@ -69,77 +67,61 @@ class Trainer(Base, ABC):
         model = model.to(self.device)
         return model
 
-    def get_transform(self, transforms_list: DictConfig) -> [A.Compose, A.Compose]:
+    def create_transform(self, transforms_list: DictConfig, remove_norm: bool = True) -> [A.Compose, A.Compose]:
         """Get the loader for training and validation."""
         image_transforms_list = get_data_transform(transforms_list)
         mask_transforms_list = image_transforms_list.copy()
-        mask_transforms_list.pop(-2)  # Remove the normalization transform
+        if remove_norm:
+            mask_transforms_list.pop(-2)  # Remove the normalization transform
         image_transforms = A.Compose(image_transforms_list)
         mask_transforms = A.Compose(mask_transforms_list)
 
         return image_transforms, mask_transforms
 
-    def get_loader(self) -> [CPUPrefetcher | CUDAPrefetcher, CPUPrefetcher | CUDAPrefetcher]:
+    def create_datasets(self, train: bool) -> FolderDataset | MVTecDataset:
         if self.cls_task:
             logger.info("Load classification dataset.")
-            train_dataset = FolderDataset(
-                self.config.DATASETS.ROOT.TRAIN,
-                self.image_transforms,
-                self.mask_size,
-            )
-            val_dataset = FolderDataset(
-                self.config.DATASETS.ROOT.get("VAL"),
+            datasets = FolderDataset(
+                self.config.DATASETS.ROOT.get("TRAIN") if train else self.config.DATASETS.ROOT.get("VAL"),
                 self.image_transforms,
                 self.mask_size,
             )
         else:
             logger.info("Load segmentation dataset.")
-            train_dataset = MVTecDataset(
+            datasets = MVTecDataset(
                 self.config.DATASETS.ROOT,
                 self.config.DATASETS.CATEGORY,
                 self.image_transforms,
                 self.mask_transforms,
                 self.mask_size,
-                train=True,
+                train=train,
             )
-            val_dataset = MVTecDataset(
-                self.config.DATASETS.ROOT,
-                self.config.DATASETS.CATEGORY,
-                self.image_transforms,
-                self.mask_transforms,
-                self.mask_size,
-                train=False,
-            )
+        return datasets
 
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset,
-            batch_size=self.config.TRAIN.HYP.get("IMGS_PER_BATCH"),
-            shuffle=True,
+    def create_dataloader(self, datasets: FolderDataset | MVTecDataset, train: bool):
+        dataloader = torch.utils.data.DataLoader(
+            datasets,
+            batch_size=self.config.TRAIN.HYP.get("IMGS_PER_BATCH") if train else len(datasets),
             num_workers=4,
-            sampler=None,
             pin_memory=True,
-            drop_last=False,
-            persistent_workers=True,
-        )
-        val_loader = torch.utils.data.DataLoader(
-            val_dataset,
-            batch_size=len(val_dataset),
-            shuffle=False,
-            num_workers=4,
-            sampler=None,
-            pin_memory=True,
-            drop_last=False,
             persistent_workers=True,
         )
 
         if self.device == "cuda":
-            train_loader = CUDAPrefetcher(train_loader, self.device)
-            val_loader = CUDAPrefetcher(val_loader, self.device)
+            dataloader = CUDAPrefetcher(dataloader, self.device)
         else:
-            train_loader = CPUPrefetcher(train_loader)
-            val_loader = CPUPrefetcher(val_loader)
+            dataloader = CPUPrefetcher(dataloader)
 
-        return train_loader, val_loader
+        return dataloader
+
+    def get_dataloader(self) -> [CPUPrefetcher | CUDAPrefetcher, CPUPrefetcher | CUDAPrefetcher]:
+        train_datasets = self.create_datasets(train=True)
+        val_datasets = self.create_datasets(train=False)
+
+        train_dataloader = self.create_dataloader(train_datasets, train=True)
+        val_dataloader = self.create_dataloader(val_datasets, train=False)
+
+        return train_dataloader, val_dataloader
 
     def get_embeddings(self) -> None:
         """Get features from the backbone network."""
@@ -169,27 +151,34 @@ class Trainer(Base, ABC):
         logger.info("Applying Gaussian fitting to the embeddings from the training set.")
         self.stats = self.model.multi_variate_gaussian.fit(embeddings)
 
-    def save_checkpoint(self) -> None:
-        """Save the model checkpoint."""
-        logger.info(f"Save the model to '{self.save_weights_path}'. please wait...")
-        torch.save({
+    def create_state_dict(self) -> Dict:
+        """Create a state dictionary for saving the model."""
+        state_dict = {
             "model": deepcopy(self.model),
             "image_transforms": self.image_transforms,
             "mask_transforms": self.mask_transforms,
             "mask_size": self.mask_size,
             "config": self.config,
-        }, self.save_weights_path)
+        }
+        return state_dict
+
+    def save_checkpoint(self, state_dict: Dict) -> None:
+        """Save the model checkpoint."""
+        logger.info(f"Save the model to '{self.save_weights_path}'. please wait...")
+        torch.save(state_dict, self.save_weights_path)
         logger.info("Save the model successfully.")
 
     def train(self) -> None:
         self.get_embeddings()
         self.compute_patch_distribution()
-        self.save_checkpoint()
+
+        state_dict = self.create_state_dict()
+        self.save_checkpoint(state_dict)
 
         self.evaler.run_validation(
             self.model,
             self.val_loader,
             self.cls_task,
             self.device,
-            self.save_visual_dir,
+            self.save_visuals_dir,
         )
