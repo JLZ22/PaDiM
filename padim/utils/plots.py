@@ -62,7 +62,8 @@ def plot_fig(test_image, scores, gts, threshold, save_dir):
         image = de_normalization(image)
         gt = gts[i].transpose(1, 2, 0).squeeze()
         heat_map = scores[i] * 255
-        mask = scores[i]
+        heat_map = heat_map.transpose(1, 2, 0).astype(np.uint8)
+        mask = scores[i].squeeze()
         mask[mask > threshold] = 1
         mask[mask <= threshold] = 0
         kernel = morphology.disk(4)

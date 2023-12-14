@@ -29,7 +29,7 @@ from padim.models import PaDiM
 from padim.utils import select_device, get_data_transform
 from padim.utils.logger import AverageMeter, ProgressMeter
 from .base import Base
-
+from .evaler import Evaler
 logger = logging.getLogger(__name__)
 
 
@@ -57,10 +57,10 @@ class Trainer(Base, ABC):
         self.save_weights_path = Path(save_weights_dir, "model.pkl")
 
         # Evaluate the model
-        # self.evaler = Evaler(config)
-        # # Create a folder to save the visual results
-        # self.save_visual_dir = Path("results", "train", config.EXP_NAME, "visual")
-        # self.save_visual_dir.mkdir(exist_ok=True, parents=True)
+        self.evaler = Evaler(config)
+        # Create a folder to save the visual results
+        self.save_visual_dir = Path("results", "train", config.EXP_NAME, "visual")
+        self.save_visual_dir.mkdir(exist_ok=True, parents=True)
 
     def create_model(self) -> nn.Module:
         """Create a model."""
@@ -174,7 +174,6 @@ class Trainer(Base, ABC):
         logger.info(f"Save the model to '{self.save_weights_path}'. please wait...")
         torch.save({
             "model": deepcopy(self.model),
-            "stats": self.stats,
             "image_transforms": self.image_transforms,
             "mask_transforms": self.mask_transforms,
             "mask_size": self.mask_size,
@@ -187,10 +186,10 @@ class Trainer(Base, ABC):
         self.compute_patch_distribution()
         self.save_checkpoint()
 
-        # self.evaler.run_validation(
-        #     self.model,
-        #     self.val_loader,
-        #     self.cls_task,
-        #     self.device,
-        #     self.save_visual_dir,
-        # )
+        self.evaler.run_validation(
+            self.model,
+            self.val_loader,
+            self.cls_task,
+            self.device,
+            self.save_visual_dir,
+        )

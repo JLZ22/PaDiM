@@ -5,6 +5,8 @@ __pycache__/
 
 padim.egg-info/
 build/
+data/folder
+data/mvtec_anomaly_detection
 dist/
 results/
 wandb/
