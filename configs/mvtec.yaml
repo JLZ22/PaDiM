@@ -1,17 +1,16 @@
 PROJECT_NAME: "padim"
-EXP_NAME: "padim-folder"
+EXP_NAME: "mvtec_bottle"
 SEED: 42
 DEVICE: "cpu"
-TASK: "classification"
+TASK: "segmentation"
 
 MODEL:
   BACKBONE: "resnet18"
   RETURN_NODES: ["layer1.1.relu_1", "layer2.1.relu_1", "layer3.1.relu_1"]
 
 DATASETS:
-  ROOT:
-    TRAIN: "./data/folder/train"
-    VAL: "./data/folder/val"
+  ROOT: "./data/mvtec_anomaly_detection"
+  CATEGORY: "bottle"
   TRANSFORMS:
     RESIZE:
       HEIGHT: 256
@@ -30,4 +29,4 @@ TRAIN:
   PRINT_FREQ: 1
 
 VAL:
-  WEIGHTS_PATH: "./results/train/padim-folder/model.pkl"
+  WEIGHTS_PATH: "./results/train/mvtec_bottle/model.pkl"

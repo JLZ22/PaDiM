@@ -38,7 +38,7 @@ class FolderDataset(torch.utils.data.Dataset):
         >>> from padim.datasets import FolderDataset
         >>> from omegaconf import OmegaConf
         >>> from padim.utils import get_data_transform
-        >>> config = OmegaConf.load("./configs/padim.yaml")
+        >>> config = OmegaConf.load("./configs/mvtec.yaml")
         >>> config = OmegaConf.create(config)
         >>> image_transforms = get_data_transform(config.DATASETS.TRANSFORMS)
         >>> dataset = FolderDataset(".data/mvtec_anomaly_detection", image_transforms)
