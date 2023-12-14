@@ -88,7 +88,7 @@ class Trainer(Base, ABC):
                 self.mask_size,
             )
             val_dataset = FolderDataset(
-                self.config.DATASETS.ROOT.TEST,
+                self.config.DATASETS.ROOT.get("VAL"),
                 self.image_transforms,
                 self.mask_size,
             )

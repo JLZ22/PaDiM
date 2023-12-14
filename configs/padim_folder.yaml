@@ -11,7 +11,7 @@ MODEL:
 DATASETS:
   ROOT:
     TRAIN: "./data/folder/train"
-    TEST: "./data/folder/test"
+    VAL: "./data/folder/val"
   TRANSFORMS:
     RESIZE:
       HEIGHT: 256

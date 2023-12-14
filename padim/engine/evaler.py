@@ -68,7 +68,7 @@ class Evaler:
         if cls_task:
             logger.info("Load classification dataset.")
             val_dataset = FolderDataset(
-                config.DATASETS.ROOT.TEST,
+                config.DATASETS.ROOT.get("VAL"),
                 image_transforms,
                 mask_size,
             )
