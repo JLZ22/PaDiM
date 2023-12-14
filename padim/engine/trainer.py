@@ -119,7 +119,7 @@ class Trainer(Base, ABC):
 
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
-            batch_size=self.config["TRAIN"]["HYP"]["IMGS_PER_BATCH"],
+            batch_size=self.config.TRAIN.HYP.get("IMGS_PER_BATCH"),
             shuffle=True,
             num_workers=4,
             sampler=None,
@@ -129,7 +129,7 @@ class Trainer(Base, ABC):
         )
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
-            batch_size=self.config["VAL"]["HYP"]["IMGS_PER_BATCH"],
+            batch_size=self.config.VAL.HYP.get("IMGS_PER_BATCH"),
             shuffle=False,
             num_workers=4,
             sampler=None,
@@ -151,7 +151,7 @@ class Trainer(Base, ABC):
         """Get features from the backbone network."""
         batch_time = AverageMeter("Time", ":6.3f")
         data_time = AverageMeter("Data", ":6.3f")
-        progress = ProgressMeter(len(self.train_loader), [batch_time, data_time], prefix=logger.info("Get features "))
+        progress = ProgressMeter(len(self.train_loader), [batch_time, data_time], prefix="Get features ")
 
         end = time.time()
         for i, batch_data in enumerate(self.train_loader):

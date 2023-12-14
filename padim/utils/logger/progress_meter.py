@@ -14,10 +14,13 @@
 """
 Progress bar printing mode
 """
+import logging
 
 __all__ = [
     "ProgressMeter",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class ProgressMeter(object):
@@ -29,12 +32,12 @@ class ProgressMeter(object):
     def display(self, batch):
         entries = [self.prefix + self.batch_fmtstr.format(batch)]
         entries += [str(meter) for meter in self.meters]
-        print("\t".join(entries))
+        logger.info("\t".join(entries))
 
     def display_summary(self):
         entries = [" *"]
         entries += [meter.summary() for meter in self.meters]
-        print(" ".join(entries))
+        logger.info(" ".join(entries))
 
     @staticmethod
     def _get_batch_fmtstr(num_batches):

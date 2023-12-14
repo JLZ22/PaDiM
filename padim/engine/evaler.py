@@ -196,7 +196,6 @@ class Evaler:
         os.makedirs(save_visual_dir, exist_ok=True)
 
         checkpoint = torch.load(self.config.VAL.WEIGHTS_PATH, map_location=device)
-        print(checkpoint)
         model = self.create_model(checkpoint, device)
         stats = self.get_stats(checkpoint, device)
         image_transforms, mask_transforms = self.get_transform(checkpoint)
