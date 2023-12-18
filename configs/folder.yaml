@@ -1,7 +1,7 @@
 PROJECT_NAME: "padim"
 EXP_NAME: "folder"
 SEED: 42
-DEVICE: "cpu"
+DEVICE: "cuda"
 TASK: "classification"
 
 MODEL:
@@ -12,7 +12,7 @@ DATASETS:
   ROOT:
     TRAIN: "./data/folder/train"
     VAL: "./data/folder/val"
-  CATEGORY: "ok"
+  CATEGORY: "good"
   TRANSFORMS:
     RESIZE:
       HEIGHT: 256

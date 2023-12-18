@@ -65,7 +65,7 @@ class Evaler(Base, ABC):
     ) -> CPUPrefetcher | CUDAPrefetcher:
         if cls_task:
             logger.info("Load classification dataset.")
-            datasets = FolderDataset(root, image_transforms, mask_size)
+            datasets = FolderDataset(root, image_transforms, mask_size, False)
         else:
             logger.info("Load segmentation dataset.")
             datasets = MVTecDataset(root, category, image_transforms, mask_transforms, mask_size, train=False)
@@ -154,7 +154,7 @@ class Evaler(Base, ABC):
             plot_fig(image_data_list, scores, mask_data_list, threshold, save_visuals_dir)
 
             fig.tight_layout()
-            save_fig_path = Path(save_visuals_dir / "roc_curve.png")
+            save_fig_path = Path(save_visuals_dir) / "roc_curve.png"
             fig.savefig(save_fig_path, dpi=100)
 
     def validation(self) -> None:
@@ -163,9 +163,12 @@ class Evaler(Base, ABC):
         cls_task: bool = False
         if self.config.TASK == "classification":
             cls_task = True
+            category = ""
+        else:
+            category = self.config.DATASETS.CATEGORY
 
         # Create a folder to save the visual results
-        save_visual_dir = os.path.join("results", "eval", self.config.EXP_NAME, "visual")
+        save_visual_dir = Path("results") / "eval" / self.config.EXP_NAME / "visual"
         os.makedirs(save_visual_dir, exist_ok=True)
 
         checkpoint = torch.load(self.config.VAL.WEIGHTS_PATH, map_location=device)
@@ -174,7 +177,7 @@ class Evaler(Base, ABC):
         mask_size = checkpoint["mask_size"]
         val_loader = self.get_dataloader(
             self.config.DATASETS.ROOT.get("VAL'") if cls_task else self.config.DATASETS.ROOT,
-            self.config.DATASETS.CATEGORY,
+            category,
             image_transforms,
             mask_transforms,
             mask_size,

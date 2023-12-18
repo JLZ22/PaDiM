@@ -38,15 +38,15 @@ class FolderDataset(torch.utils.data.Dataset):
         >>> from padim.datasets import FolderDataset
         >>> from omegaconf import OmegaConf
         >>> from padim.utils import get_data_transform
-        >>> config = OmegaConf.load("./configs/mvtec.yaml")
+        >>> config = OmegaConf.load("configs/folder.yaml")
         >>> config = OmegaConf.create(config)
         >>> image_transforms = A.Compose(get_data_transform(config.DATASETS.TRANSFORMS))
         >>> mask_size = (224, 224)
-        >>> dataset = FolderDataset(".data/mvtec_anomaly_detection", image_transforms, mask_size)
+        >>> dataset = FolderDataset("data/folder/train", image_transforms, mask_size, True)
         >>> sample = dataset[0]
         >>> image, target, mask, image_path = sample["image"], sample["target"], sample["mask"], sample["image_path"]
         >>> print(image.shape, target, mask.shape, image_path)
-        torch.Size([3, 224, 224]) 0 torch.Size([1, 224, 224]) ./data/image_folder/good_000.png
+        torch.Size([3, 224, 224]) 0 torch.Size([1, 224, 224]) ./data/folder/train/good/000.png
     """
 
     def __init__(
@@ -54,18 +54,23 @@ class FolderDataset(torch.utils.data.Dataset):
             root: str | Path,
             image_transform: A.Compose = None,
             mask_size: tuple[int, int] = (224, 224),
+            train: bool = True,
     ) -> None:
         super().__init__()
-        self.root = Path(root)
+        if isinstance(root, str):
+            root = Path(root)
         self.image_transforms = image_transform
         self.mask_size = mask_size
 
         # load dataset
-        image_name_list = os.listdir(self.root)
-        self.image_path_list = sorted(os.path.join(self.root, image_name) for image_name in image_name_list)
+        if train:
+            pattern = "good/*"
+        else:
+            pattern = "*/*"
+        self.image_path_list = list(root.glob(pattern))
 
     def __getitem__(self, index: int) -> dict[str, str | None | Any]:
-        image_path = self.image_path_list[index]
+        image_path = str(self.image_path_list[index])
 
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

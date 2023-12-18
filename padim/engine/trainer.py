@@ -85,6 +85,7 @@ class Trainer(Base, ABC):
                 self.config.DATASETS.ROOT.get("TRAIN") if train else self.config.DATASETS.ROOT.get("VAL"),
                 self.image_transforms,
                 self.mask_size,
+                train=train,
             )
         else:
             logger.info("Load segmentation dataset.")
