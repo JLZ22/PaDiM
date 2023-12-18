@@ -40,7 +40,6 @@ class MVTecDataset(torch.utils.data.Dataset):
         mask_transform (A.Compose, optional): mask transform. Defaults to None.
         mask_size (tuple[int, int], optional): mask size after resizing. Defaults to (224, 224).
         train (bool): if True, load train dataset, else load test dataset.
-        download (bool): if True, download dataset and save it to ``root`` directory. Defaults to False.
 
     Examples:
         >>> from padim.datasets import MVTecDataset
@@ -80,7 +79,6 @@ class MVTecDataset(torch.utils.data.Dataset):
             mask_transform: A.Compose = None,
             mask_size: tuple[int, int] = (224, 224),
             train: bool = True,
-            download: bool = False,
     ) -> None:
         super().__init__()
         self.root = Path(root)
@@ -89,9 +87,6 @@ class MVTecDataset(torch.utils.data.Dataset):
         self.mask_transforms = mask_transform
         self.mask_size = mask_size
         self.train = train
-
-        if download:
-            self.download()
 
         # load dataset
         self.image_path_list, self.target_type_list, self.mask_path_list = self.load()
