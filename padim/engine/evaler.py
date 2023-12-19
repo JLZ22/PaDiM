@@ -68,7 +68,7 @@ class Evaler(Base, ABC):
             datasets = FolderDataset(root, image_transforms, mask_size, False)
         else:
             logger.info("Load segmentation dataset.")
-            datasets = MVTecDataset(root, category, image_transforms, mask_transforms, mask_size, train=False)
+            datasets = MVTecDataset(root, category, image_transforms, mask_transforms, mask_size, False)
 
         dataloader = torch.utils.data.DataLoader(
             datasets,
@@ -134,8 +134,8 @@ class Evaler(Base, ABC):
             gt_list = np.asarray(target_data_list)
             fpr, tpr, _ = roc_curve(gt_list, image_scores)
             image_roc_auc = roc_auc_score(gt_list, image_scores)
-            print(f"image ROCAUC: {image_roc_auc:.3f}")
-            fig_image_roc_auc.plot(fpr, tpr, label=f"image_ROCAUC: {image_roc_auc:.3f}")
+            print(f"image ROC_AUC: {image_roc_auc:.3f}")
+            fig_image_roc_auc.plot(fpr, tpr, label=f"image_ROC_AUC: {image_roc_auc:.3f}")
 
             # get optimal threshold
             gt_mask = np.asarray(mask_data_list)
@@ -145,12 +145,12 @@ class Evaler(Base, ABC):
             f1 = np.divide(a, b, out=np.zeros_like(a), where=b != 0)
             threshold = thresholds[np.argmax(f1)]
 
-            # calculate per-pixel level ROCAUC
+            # calculate per-pixel level ROC_AUC
             fpr, tpr, _ = roc_curve(gt_mask.flatten(), scores.flatten())
             per_pixel_roc_auc = roc_auc_score(gt_mask.flatten(), scores.flatten())
-            print(f"pixel ROCAUC: {per_pixel_roc_auc:.3f}")
+            print(f"pixel ROC_AUC: {per_pixel_roc_auc:.3f}")
 
-            fig_pixel_roc_auc.plot(fpr, tpr, label=f"pixel_ROCAUC: {per_pixel_roc_auc:.3f}")
+            fig_pixel_roc_auc.plot(fpr, tpr, label=f"pixel_ROC_AUC: {per_pixel_roc_auc:.3f}")
             plot_fig(image_data_list, scores, mask_data_list, threshold, save_visuals_dir)
 
             fig.tight_layout()
@@ -160,16 +160,11 @@ class Evaler(Base, ABC):
     def validation(self) -> None:
         device = select_device(self.config["DEVICE"])
 
-        cls_task: bool = False
-        if self.config.TASK == "classification":
-            cls_task = True
-            category = ""
-        else:
-            category = self.config.DATASETS.CATEGORY
+        cls_task = self.config.TASK == "classification"
 
         # Create a folder to save the visual results
         save_visual_dir = Path("results") / "eval" / self.config.EXP_NAME / "visual"
-        os.makedirs(save_visual_dir, exist_ok=True)
+        save_visual_dir.mkdir(exist_ok=True, parents=True)
 
         checkpoint = torch.load(self.config.VAL.WEIGHTS_PATH, map_location=device)
         model = self.create_model(checkpoint, device)
@@ -177,7 +172,7 @@ class Evaler(Base, ABC):
         mask_size = checkpoint["mask_size"]
         val_loader = self.get_dataloader(
             self.config.DATASETS.ROOT.get("VAL'") if cls_task else self.config.DATASETS.ROOT,
-            category,
+            self.config.DATASETS.CATEGORY,
             image_transforms,
             mask_transforms,
             mask_size,

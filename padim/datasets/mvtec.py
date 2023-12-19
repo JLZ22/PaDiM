@@ -45,12 +45,12 @@ class MVTecDataset(torch.utils.data.Dataset):
         >>> from padim.datasets import MVTecDataset
         >>> from omegaconf import OmegaConf
         >>> from padim.utils import get_data_transform
-        >>> config = OmegaConf.load("./configs/mvtec.yaml")
+        >>> config = OmegaConf.load("configs/mvtec.yaml")
         >>> config = OmegaConf.create(config)
         >>> image_transforms = A.Compose(get_data_transform(config.DATASETS.TRANSFORMS))
         >>> mask_transforms = A.Compose(get_data_transform(config.DATASETS.TRANSFORMS))
         >>> mask_size = (config.DATASETS.TRANSFORMS.CENTER_CROP.HEIGHT, config.DATASETS.TRANSFORMS.CENTER_CROP.WIDTH)
-        >>> dataset = MVTecDataset("./data/mvtec_anomaly_detection", "bottle", image_transforms, mask_transforms, mask_size, train=False)
+        >>> dataset = MVTecDataset("data/mvtec_anomaly_detection", "bottle", image_transforms, mask_transforms, mask_size, False)
         >>> sample = dataset[0]
         >>> image, target, mask, image_path = sample["image"], sample["target"], sample["mask"], sample["image_path"]
         >>> print(image.shape, target, mask.shape, image_path)
@@ -96,7 +96,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         target_type = self.target_type_list[index]
         mask_path = self.mask_path_list[index]
 
-        image = cv2.imread(image_path)
+        image = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = image.astype("float32") / 255.0
         image = self.image_transforms(image=image)["image"]
@@ -104,8 +104,7 @@ class MVTecDataset(torch.utils.data.Dataset):
         if target_type == 0:
             mask = torch.zeros([1, self.mask_size[0], self.mask_size[1]])
         else:
-            mask = cv2.imread(mask_path)
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+            mask = cv2.imread(mask_path, cv2.IMREAD_UNCHANGED)
             mask = mask.astype("float32") / 255.0
             mask = self.mask_transforms(image=mask)["image"]
 

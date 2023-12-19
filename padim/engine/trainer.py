@@ -67,12 +67,11 @@ class Trainer(Base, ABC):
         model = model.to(self.device)
         return model
 
-    def create_transform(self, transforms_list: DictConfig, remove_norm: bool = True) -> [A.Compose, A.Compose]:
+    def create_transform(self, transforms_list: DictConfig) -> [A.Compose, A.Compose]:
         """Get the loader for training and validation."""
         image_transforms_list = get_data_transform(transforms_list)
         mask_transforms_list = image_transforms_list.copy()
-        if remove_norm:
-            mask_transforms_list.pop(-2)  # Remove the normalization transform
+        mask_transforms_list.pop(-2)  # Remove the normalization transform
         image_transforms = A.Compose(image_transforms_list)
         mask_transforms = A.Compose(mask_transforms_list)
 
@@ -85,7 +84,7 @@ class Trainer(Base, ABC):
                 self.config.DATASETS.ROOT.get("TRAIN") if train else self.config.DATASETS.ROOT.get("VAL"),
                 self.image_transforms,
                 self.mask_size,
-                train=train,
+                train,
             )
         else:
             logger.info("Load segmentation dataset.")
@@ -95,7 +94,7 @@ class Trainer(Base, ABC):
                 self.image_transforms,
                 self.mask_transforms,
                 self.mask_size,
-                train=train,
+                train,
             )
         return datasets
 
