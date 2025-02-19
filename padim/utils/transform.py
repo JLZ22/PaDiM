@@ -37,11 +37,19 @@ def get_data_transform(transform_dict: DictConfig) -> list:
     transform_list = []
 
     resize_transform = transform_dict.get("RESIZE", {})
+    shift_scale_rotate_transform = transform_dict.get("SHIFT_SCALE_ROTATE", {})
+    affine = transform_dict.get("AFFINE", {})
     center_crop_transform = transform_dict.get("CENTER_CROP", {})
     normalize_transform = transform_dict.get("NORMALIZE", {})
 
     if resize_transform:
         transform_list.append(A.Resize(resize_transform.get("HEIGHT"), resize_transform.get("WIDTH"), cv2.INTER_NEAREST))
+
+    if affine:
+        transform_list.append(A.Affine(
+            translate_percent=affine.get("TRANSLATE_PERCENT"),
+            p=affine.get("P"),
+        ))
 
     if center_crop_transform:
         transform_list.append(A.CenterCrop(center_crop_transform.get("HEIGHT"), center_crop_transform.get("WIDTH")))

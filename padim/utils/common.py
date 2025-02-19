@@ -50,7 +50,7 @@ def select_device(device: str = "cpu") -> torch.device:
     Returns:
         torch.device: device.
     """
-    supported_devices = ["cpu", "cuda", "gpu"]
+    supported_devices = ["cpu", "cuda", "gpu", 'mps']
     if device not in supported_devices:
         raise ValueError(f"Device '{device}' not supported. Choices: {supported_devices}")
 
@@ -59,6 +59,9 @@ def select_device(device: str = "cpu") -> torch.device:
         device = torch.device("cpu")
         if torch.cuda.is_available():
             logger.info("You have a CUDA device, enabling CUDA will give you a large boost in performance.")
+    elif device == "mps":
+        logger.info("Use MPS.")
+        device = torch.device("mps")
     elif device in ["cuda", "gpu"]:
         if not torch.cuda.is_available():
             logger.warning("CUDA is not available, switching to CPU.")
